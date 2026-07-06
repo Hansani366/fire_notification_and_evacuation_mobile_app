@@ -1,0 +1,57 @@
+import 'package:shared_preferences/shared_preferences.dart';
+
+/// Where the app finds the `alert-service` backend.
+///
+/// A phone must reach the server by its **LAN IP**, never `localhost`. Set it
+/// three ways (in order of precedence at runtime):
+///  1. An in-app override saved to shared_preferences (long-press the dashboard
+///     title → "Server URL"). Survives restarts.
+///  2. A compile-time default via `--dart-define=API_BASE_URL=http://<ip>:8090`.
+///  3. The built-in fallback below (`10.0.2.2` = the host loopback as seen from
+///     the Android emulator).
+class AppConfig {
+  AppConfig._();
+
+  static const String _prefsKey = 'api_base_url';
+
+  static const String _envBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://10.0.2.2:8090',
+  );
+
+  static String _baseUrl = _envBaseUrl;
+
+  /// Current backend origin, e.g. `http://192.168.1.10:8090` (no trailing slash).
+  static String get baseUrl => _baseUrl;
+
+  /// Load a persisted override, if the user set one. Call once in `main()`.
+  static Future<void> load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(_prefsKey);
+      if (saved != null && saved.trim().isNotEmpty) {
+        _baseUrl = _normalise(saved);
+      }
+    } catch (_) {
+      // Non-fatal: fall back to the compile-time default.
+    }
+  }
+
+  /// Persist a new base URL at runtime (the demo settings field).
+  static Future<void> setBaseUrl(String url) async {
+    _baseUrl = _normalise(url);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefsKey, _baseUrl);
+  }
+
+  /// Build a request URI for a backend path like `/api/state`.
+  static Uri api(String path) => Uri.parse('$_baseUrl$path');
+
+  static String _normalise(String url) {
+    var u = url.trim();
+    while (u.endsWith('/')) {
+      u = u.substring(0, u.length - 1);
+    }
+    return u;
+  }
+}
