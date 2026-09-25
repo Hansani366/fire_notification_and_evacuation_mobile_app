@@ -17,6 +17,7 @@ import '../../shared/widgets/meta_line.dart';
 import '../../shared/widgets/pill_button.dart';
 import 'widgets/detection_panel.dart';
 import 'widgets/guidance_card.dart';
+import 'widgets/situation_report_card.dart';
 
 /// Flow A: the confirmed emergency alert — detection panel, plain-English AI
 /// read, animated safe route, and evacuation CTAs. No live video.
@@ -128,12 +129,18 @@ class _IncidentScreenState extends State<IncidentScreen> {
                       _OccupancyLine(count: occupants),
                     ],
                     const SizedBox(height: 12),
-                    _AiReportCard(
-                      label: isFire
-                          ? 'What the scene AI reports'
-                          : 'What the sensors report',
-                      text: event.description,
-                    ),
+                    // The validated report supersedes the raw sentence when one
+                    // exists: same information, but each line carries whether
+                    // anything could actually confirm it.
+                    if (incident.situationReport case final r? when !r.isEmpty)
+                      SituationReportCard(report: r)
+                    else
+                      _AiReportCard(
+                        label: isFire
+                            ? 'What the scene AI reports'
+                            : 'What the sensors report',
+                        text: event.description,
+                      ),
                     if (incident.classification case final c?) ...[
                       const SizedBox(height: 12),
                       GuidanceCard(classification: c),

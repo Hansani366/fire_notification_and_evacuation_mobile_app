@@ -590,6 +590,103 @@ class CheckoutRoll {
       };
 }
 
+/// How a single claim in the situation report stood up to the evidence.
+///
+/// The three categories are Table 3.20's, applied at release time rather than in
+/// analysis afterwards. [contradicted] claims never arrive — the backend strips
+/// them — so in practice the app renders [supported] plainly and marks
+/// [unsupported].
+enum ClaimGrounding {
+  supported,
+  unsupported,
+  contradicted;
+
+  /// True when nothing in the system could confirm or deny it. Shown, but never
+  /// shown as a finding.
+  bool get needsMarking => this == ClaimGrounding.unsupported;
+
+  static ClaimGrounding fromWire(String? s) => switch (s) {
+        'contradicted' => ClaimGrounding.contradicted,
+        'unsupported' => ClaimGrounding.unsupported,
+        _ => ClaimGrounding.supported,
+      };
+}
+
+/// One statement in the situation report, with its verdict.
+class ReportClaim {
+  const ReportClaim({
+    required this.id,
+    required this.label,
+    required this.text,
+    required this.grounding,
+    this.evidence = '',
+    this.why = '',
+  });
+
+  final String id;
+  final String label;
+  final String text;
+  final ClaimGrounding grounding;
+
+  /// What checked it — "human detector", "classifier", "zone model".
+  final String evidence;
+  final String why;
+
+  factory ReportClaim.fromJson(Map<String, dynamic> j) => ReportClaim(
+        id: j['id'] as String? ?? '',
+        label: j['label'] as String? ?? '',
+        text: j['text'] as String? ?? '',
+        grounding: ClaimGrounding.fromWire(j['category'] as String?),
+        evidence: j['evidence'] as String? ?? '',
+        why: j['why'] as String? ?? '',
+      );
+}
+
+/// The situation report (RO3.1), after every claim was checked against the
+/// logged detection and sensor evidence.
+///
+/// WHAT ARRIVES HERE HAS ALREADY BEEN FILTERED. Claims the evidence contradicted
+/// were withheld by the backend, which is the point of validating before release
+/// rather than afterwards. What the app still has to do is honour the
+/// distinction between a claim that was confirmed and one that merely could not
+/// be checked — rendering those identically would undo the whole exercise.
+class SituationReport {
+  const SituationReport({
+    this.claims = const [],
+    this.narrative = '',
+    this.withheldCount = 0,
+    this.groundingAccuracy,
+  });
+
+  final List<ReportClaim> claims;
+
+  /// The model's own sentence, carried as context. Never a graded finding.
+  final String narrative;
+
+  /// How many claims the evidence contradicted and the backend removed.
+  final int withheldCount;
+  final double? groundingAccuracy;
+
+  bool get isEmpty => claims.isEmpty && narrative.isEmpty;
+  List<ReportClaim> get shown =>
+      claims.where((c) => c.grounding != ClaimGrounding.contradicted).toList();
+  bool get hasUnverified => shown.any((c) => c.grounding.needsMarking);
+
+  factory SituationReport.fromJson(Map<String, dynamic> j) {
+    final g = j['grounding'] as Map<String, dynamic>? ?? const {};
+    return SituationReport(
+      claims: (j['claims'] as List<dynamic>? ?? const [])
+          .map((e) => ReportClaim.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      narrative: j['narrative'] as String? ?? '',
+      withheldCount: _asInt(g['contradicted']),
+      groundingAccuracy: g['groundingAccuracy'] == null
+          ? null
+          : _asDouble(g['groundingAccuracy']),
+    );
+  }
+}
+
 /// An active, confirmed emergency (drives the incident + resolved screens).
 class Incident {
   const Incident({
@@ -604,6 +701,7 @@ class Incident {
     this.sensorSummary = '',
     this.route,
     this.checkout = const CheckoutRoll(),
+    this.situationReport,
   });
 
   final String id;
@@ -632,6 +730,9 @@ class Incident {
   /// Check-out progress, kept separate from [muster] on purpose — see
   /// [CheckoutRoll].
   final CheckoutRoll checkout;
+
+  /// The validated situation report, or null when none was generated.
+  final SituationReport? situationReport;
 
   /// True for the neutral stand-in the repository holds so `activeIncident` is
   /// never null. The dashboard needs this because the backend deliberately
@@ -662,6 +763,10 @@ class Incident {
             ? null
             : EvacRoute.fromJson(j['route'] as Map<String, dynamic>),
         checkout: CheckoutRoll.fromJson(j['checkout'] as Map<String, dynamic>?),
+        situationReport: j['situationReport'] == null
+            ? null
+            : SituationReport.fromJson(
+                j['situationReport'] as Map<String, dynamic>),
         classification: j['classification'] == null
             ? null
             : FireClassification.fromJson(
