@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/theme/app_typography.dart';
 import '../widgets/surface_card.dart';
+import '../../data/models/models.dart';
 import 'floor_plan_data.dart';
 import 'floor_plan_view.dart';
 
@@ -17,12 +18,18 @@ class LegendItem {
 class LocatorCard extends StatelessWidget {
   const LocatorCard({
     super.key,
+    required this.plan,
     required this.mode,
+    this.route,
+    this.focusRoomId,
     this.header,
     this.legend = const [],
   });
 
+  final FloorPlan plan;
   final FloorPlanMode mode;
+  final EvacRoute? route;
+  final String? focusRoomId;
   final String? header;
   final List<LegendItem> legend;
 
@@ -43,7 +50,7 @@ class LocatorCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
           ],
-          FloorPlanView(mode: mode),
+          FloorPlanView(plan: plan, mode: mode, route: route, focusRoomId: focusRoomId),
           if (legend.isNotEmpty) ...[
             const SizedBox(height: 12),
             const _DashedDivider(),

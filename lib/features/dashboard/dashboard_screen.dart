@@ -23,7 +23,12 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final repo = RepositoryScope.of(context);
     final zones = repo.zones;
-    final allClear = repo.allClear;
+    final incident = repo.activeIncident;
+    // TWO CONDITIONS, NOT ONE. During an open gas warning the backend returns
+    // `allClear: true` *and* an active incident, deliberately: nothing is
+    // burning, so no zone turns red. Reading only `allClear` printed "All clear"
+    // across the top of the screen while a warning was live underneath it.
+    final allClear = repo.allClear && !repo.hasActiveIncident;
 
     return ContentShell(
       bottom: false,
@@ -61,8 +66,9 @@ class DashboardScreen extends StatelessWidget {
             )
           else
             _AlertHero(
-              incident: repo.activeIncident,
-              onTap: () => context.push('/incident'),
+              incident: incident,
+              onTap: () => context.push(
+                  incident.severity == IncidentSeverity.warning ? '/warning' : '/incident'),
             ),
           const SizedBox(height: 16),
           HealthRow(stats: repo.health),
@@ -122,10 +128,34 @@ class _AlertHero extends StatelessWidget {
   final Incident incident;
   final VoidCallback onTap;
 
+  /// A gas warning is not an emergency and must not be painted like one. Amber
+  /// for "we are watching something", red only for an alarm that means leave.
+  Color get _tone =>
+      incident.severity == IncidentSeverity.warning ? AppColors.warn : AppColors.danger;
+
+  Color get _toneBg =>
+      incident.severity == IncidentSeverity.warning ? AppColors.warnBg : AppColors.dangerBg;
+
+  String get _headline => switch (incident.severity) {
+        IncidentSeverity.warning => '⚠️ Gas levels rising',
+        IncidentSeverity.gasDanger => '⚠️ Dangerous gas',
+        IncidentSeverity.fire => '🔥 Fire detected',
+      };
+
+  /// No percentage here either: a sensor-only alarm carries 0.0 by design, and
+  /// "Confirmed 0%" on the dashboard is the same falsehood as on the incident
+  /// screen, just smaller.
+  String get _subtitle => switch (incident.severity) {
+        IncidentSeverity.warning => 'No fire seen on camera · tap for details',
+        IncidentSeverity.gasDanger => 'Detected by sensors · tap for your safe route',
+        IncidentSeverity.fire => incident.hasMeaningfulConfidence
+            ? 'Confirmed ${incident.event.confidencePct}% · tap for your safe route'
+            : 'Confirmed on camera · tap for your safe route',
+      };
+
   @override
   Widget build(BuildContext context) {
     final zone = incident.zone;
-    final event = incident.event;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -133,9 +163,9 @@ class _AlertHero extends StatelessWidget {
         onTap: onTap,
         child: Ink(
           decoration: BoxDecoration(
-            color: AppColors.dangerBg,
+            color: _toneBg,
             borderRadius: AppRadii.large,
-            border: Border.all(color: AppColors.danger.withValues(alpha: 0.35)),
+            border: Border.all(color: _tone.withValues(alpha: 0.35)),
           ),
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -145,11 +175,11 @@ class _AlertHero extends StatelessWidget {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: AppColors.danger,
+                    color: _tone,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.danger.withValues(alpha: 0.32),
+                        color: _tone.withValues(alpha: 0.32),
                         offset: const Offset(0, 8),
                         blurRadius: 20,
                       ),
@@ -165,18 +195,18 @@ class _AlertHero extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('🔥 Fire detected',
-                          style: AppText.pjs(20, 800, color: AppColors.danger)),
+                      Text(_headline,
+                          style: AppText.pjs(20, 800, color: _tone)),
                       const SizedBox(height: 3),
                       Text('${zone.name} · ${zone.floor}',
                           style: AppText.inter(14, 600, color: AppColors.ink)),
                       const SizedBox(height: 2),
-                      Text('Confirmed ${event.confidencePct}% · tap for your safe route',
+                      Text(_subtitle,
                           style: AppText.inter(13, 400, color: AppColors.ink2)),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: AppColors.danger),
+                Icon(Icons.chevron_right, color: _tone),
               ],
             ),
           ),

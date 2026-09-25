@@ -16,6 +16,11 @@ class ApiClient {
   Future<Map<String, dynamic>> getState() async =>
       _decodeMap(await _client.get(AppConfig.api('/api/state')).timeout(_timeout));
 
+  /// Which site the backend is routing for, and in what coordinate space.
+  /// Not geometry — the app carries its own drawings; this says which to use.
+  Future<Map<String, dynamic>> getSitePlan() async =>
+      _decodeMap(await _client.get(AppConfig.api('/api/site/plan')).timeout(_timeout));
+
   Future<Map<String, dynamic>> getIncident(String id) async =>
       _decodeMap(await _client.get(AppConfig.api('/api/incidents/$id')).timeout(_timeout));
 

@@ -23,6 +23,11 @@ class ZoneGlyphIcon extends StatelessWidget {
       ZoneGlyph.dyeing => Icons.local_laundry_service_outlined,
       ZoneGlyph.warehouse => Icons.warehouse_outlined,
       ZoneGlyph.finishing => Icons.checkroom_outlined,
+      ZoneGlyph.kitchen => Icons.countertops_outlined,
+      ZoneGlyph.bedroom => Icons.bed_outlined,
+      ZoneGlyph.dining => Icons.dining_outlined,
+      ZoneGlyph.living => Icons.weekend_outlined,
+      ZoneGlyph.verander => Icons.deck_outlined,
       _ => null,
     };
     if (material != null) {

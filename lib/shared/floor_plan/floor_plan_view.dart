@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../data/models/models.dart';
 import 'floor_plan_data.dart';
 import 'floor_plan_painter.dart';
 
@@ -9,9 +10,18 @@ import 'floor_plan_painter.dart';
 /// for the incident route, drives the marching route + pulsing markers. Honors
 /// the platform "remove animations" setting by holding a static frame.
 class FloorPlanView extends StatefulWidget {
-  const FloorPlanView({super.key, required this.mode});
+  const FloorPlanView({
+    super.key,
+    required this.plan,
+    required this.mode,
+    this.route,
+    this.focusRoomId,
+  });
 
+  final FloorPlan plan;
   final FloorPlanMode mode;
+  final EvacRoute? route;
+  final String? focusRoomId;
 
   @override
   State<FloorPlanView> createState() => _FloorPlanViewState();
@@ -55,7 +65,7 @@ class _FloorPlanViewState extends State<FloorPlanView>
   @override
   Widget build(BuildContext context) {
     final aspect =
-        FloorPlan.designSize.width / FloorPlan.designSize.height;
+        widget.plan.designSize.width / widget.plan.designSize.height;
 
     Widget paint(FloorPlanPainter painter) => ClipRRect(
           borderRadius: const BorderRadius.all(Radius.circular(10)),
@@ -67,7 +77,12 @@ class _FloorPlanViewState extends State<FloorPlanView>
 
     final controller = _controller;
     if (controller == null) {
-      return paint(FloorPlanPainter(mode: widget.mode));
+      return paint(FloorPlanPainter(
+        plan: widget.plan,
+        mode: widget.mode,
+        route: widget.route,
+        focusRoomId: widget.focusRoomId,
+      ));
     }
 
     return AnimatedBuilder(
@@ -77,7 +92,10 @@ class _FloorPlanViewState extends State<FloorPlanView>
         final elapsed = controller.value * 3.0; // seconds
         return paint(
           FloorPlanPainter(
+            plan: widget.plan,
             mode: widget.mode,
+            route: widget.route,
+            focusRoomId: widget.focusRoomId,
             routePhase: reduce ? 0 : controller.value,
             firePulse: reduce
                 ? 1

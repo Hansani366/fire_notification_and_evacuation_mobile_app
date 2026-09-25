@@ -20,9 +20,29 @@ abstract class FireRepository extends ChangeNotifier {
   Zone? zoneById(String id);
   HistoryEvent? historyById(String id);
 
-  /// True when every zone is at rest (drives the dashboard "All clear" hero).
+  /// True when every zone is at rest.
+  ///
+  /// NOT sufficient on its own to show "All clear": during an open gas warning
+  /// the backend reports this as true *and* hands over an active incident,
+  /// deliberately, because nothing is burning and no zone should turn red.
+  /// Combine it with [hasActiveIncident].
   bool get allClear;
+
+  /// True when an incident is open right now.
+  ///
+  /// Separate from [activeIncident] being non-null, because it never is — the
+  /// repository always holds a neutral placeholder so screens can read it
+  /// synchronously.
+  bool get hasActiveIncident => !activeIncident.isPlaceholder;
+
   int get detectorCount;
+
+  /// Which facility drawing to pair a route with.
+  ///
+  /// The backend owns the graph and the app owns the artwork, so this is the
+  /// handshake between them (`GET /api/site/plan`). Defaults to the demo site,
+  /// which is also the right answer when there is no backend at all.
+  String get siteKey => 'unit7';
 
   /// Personal "I'm safe" muster check-in for the active incident.
   /// No-op in the mock; the live repository posts it to the backend.
@@ -35,12 +55,20 @@ abstract class FireRepository extends ChangeNotifier {
 /// In-memory implementation seeded from [MockData]. Used for widget tests and
 /// as a static fallback; the live app uses [ApiFireRepository].
 class MockFireRepository extends FireRepository {
-  MockFireRepository() : _now = DateTime.now() {
+  /// [incident] and [live] exist so a test can stand up a specific situation —
+  /// an open gas warning, a carbon-monoxide alarm, a fire confirmed while the
+  /// scene model was unreachable — without a backend. Left alone, this is the
+  /// resting all-clear state with a fire fixture behind the takeover screens.
+  MockFireRepository({Incident? incident, this.live = false})
+      : _now = DateTime.now() {
     _zones = MockData.zones(_now);
-    _incident = MockData.incident(_now);
+    _incident = incident ?? MockData.incident(_now);
   }
 
   final DateTime _now;
+
+  /// Whether [activeIncident] represents something happening right now.
+  final bool live;
   late final List<Zone> _zones;
   late final Incident _incident;
 
@@ -55,6 +83,13 @@ class MockFireRepository extends FireRepository {
 
   @override
   Incident get activeIncident => _incident;
+
+  /// The mock's incident is a **fixture** for the takeover screens, not a live
+  /// alarm: the mock dashboard is deliberately the resting, all-clear state.
+  /// Reporting it as active would make the offline build — and the widget tests
+  /// — open on a fire that is not happening. A test can opt in with `live: true`.
+  @override
+  bool get hasActiveIncident => live;
 
   @override
   List<HistoryEvent> get history => MockData.history;

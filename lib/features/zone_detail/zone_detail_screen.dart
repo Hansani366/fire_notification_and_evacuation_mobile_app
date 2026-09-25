@@ -21,7 +21,8 @@ class ZoneDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final zone = RepositoryScope.of(context).zoneById(zoneId);
+    final repo = RepositoryScope.of(context);
+    final zone = repo.zoneById(zoneId);
 
     return Scaffold(
       body: ContentShell(
@@ -37,9 +38,17 @@ class ZoneDetailScreen extends StatelessWidget {
                   GreetingAppBar(
                     title: zone.name,
                     subtitle: '${zone.floor} · ${zone.detectorId}',
+                    // Was hard-coded to "All clear" regardless of state, so a
+                    // burning zone's own detail screen said it was fine.
                     trailing: StatusChip(
-                      label: 'All clear',
-                      tone: ChipTone.clear,
+                      label: zone.status == ZoneStatus.clear
+                          ? 'All clear'
+                          : zone.status.label,
+                      tone: switch (zone.status) {
+                        ZoneStatus.clear => ChipTone.clear,
+                        ZoneStatus.smoke => ChipTone.smoke,
+                        ZoneStatus.fire => ChipTone.fire,
+                      },
                     ),
                   ),
                   StatusHero(
@@ -52,7 +61,10 @@ class ZoneDetailScreen extends StatelessWidget {
                     subtitle: Text.rich(
                       TextSpan(
                         children: [
-                          const TextSpan(text: 'Both AI checks agree · last scan '),
+                          TextSpan(
+                              text: zone.status == ZoneStatus.clear
+                                  ? 'Both AI checks agree · last scan '
+                                  : 'Under review · last scan '),
                           TextSpan(
                             text: scannedAgo(zone.lastScanAt)
                                 .replaceFirst('Scanned ', ''),
@@ -63,10 +75,14 @@ class ZoneDetailScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  const LocatorCard(
+                  LocatorCard(
+                    plan: FloorPlan.bySiteKey(repo.siteKey),
                     mode: FloorPlanMode.zoneSafe,
-                    header: 'This zone · Main floor',
-                    legend: [
+                    // Was pinned to the Fabric Store, so every zone's detail
+                    // screen highlighted a room the reader was not looking at.
+                    focusRoomId: zoneId,
+                    header: 'This zone · ${zone.floor}',
+                    legend: const [
                       LegendItem(AppColors.safe, 'This zone · safe'),
                       LegendItem(AppColors.safe, 'Fire exit'),
                       LegendItem(AppColors.planDoor, 'Door'),

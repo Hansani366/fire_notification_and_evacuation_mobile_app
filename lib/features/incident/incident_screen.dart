@@ -8,6 +8,7 @@ import '../../core/layout/takeover_frame.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/theme/app_typography.dart';
 import '../../data/mock/fire_repository.dart';
+import '../../data/models/models.dart';
 import '../../shared/floor_plan/floor_plan_data.dart';
 import '../../shared/floor_plan/locator_card.dart';
 import '../../shared/util/format.dart';
@@ -15,6 +16,7 @@ import '../../shared/widgets/greeting_app_bar.dart';
 import '../../shared/widgets/meta_line.dart';
 import '../../shared/widgets/pill_button.dart';
 import 'widgets/detection_panel.dart';
+import 'widgets/guidance_card.dart';
 
 /// Flow A: the confirmed emergency alert — detection panel, plain-English AI
 /// read, animated safe route, and evacuation CTAs. No live video.
@@ -66,6 +68,8 @@ class _IncidentScreenState extends State<IncidentScreen> {
     final zone = incident.zone;
     final event = incident.event;
     final elapsed = _now.difference(event.detectedAt);
+    final isFire = incident.severity == IncidentSeverity.fire;
+    final occupants = incident.occupancy.current;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark,
@@ -83,9 +87,15 @@ class _IncidentScreenState extends State<IncidentScreen> {
                       onTap: () => context.go('/dashboard'),
                     ),
                     const SizedBox(height: 4),
-                    const _IncidentFlag(),
+                    _IncidentFlag(severity: incident.severity),
                     const SizedBox(height: 14),
-                    Text('🔥 Fire detected', style: AppText.incidentTitle),
+                    Text(
+                      // Tier 1b is an alarm with nothing visible on camera.
+                      // Announcing a flame nobody saw is the one thing this
+                      // screen must not do.
+                      isFire ? '🔥 Fire detected' : '⚠️ Dangerous gas',
+                      style: AppText.incidentTitle,
+                    ),
                     const SizedBox(height: 4),
                     Text.rich(
                       TextSpan(
@@ -102,21 +112,39 @@ class _IncidentScreenState extends State<IncidentScreen> {
                     const SizedBox(height: 16),
                     DetectionPanel(
                       zoneName: zone.name,
-                      subtitle:
-                          '${zone.floor} · ${zone.detectorId} · type: ${event.type.label.toLowerCase()}',
-                      confidence: event.confidence,
+                      subtitle: isFire
+                          ? '${zone.floor} · ${zone.detectorId} · type: ${event.type.label.toLowerCase()}'
+                          : '${zone.floor} · ${zone.detectorId} · nothing visible on camera',
+                      // Null suppresses the meter entirely — see DetectionPanel.
+                      confidence:
+                          incident.hasMeaningfulConfidence ? event.confidence : null,
+                      evidenceNote: 'Detected by sensors',
+                      isFlame: isFire,
                     ),
                     const SizedBox(height: 12),
-                    const _TrustBadge('Confirmed by 2 AI checks · object + scene'),
+                    _TrustBadge(incident: incident),
+                    if (occupants != null) ...[
+                      const SizedBox(height: 12),
+                      _OccupancyLine(count: occupants),
+                    ],
                     const SizedBox(height: 12),
                     _AiReportCard(
-                      label: 'What the scene AI reports',
+                      label: isFire
+                          ? 'What the scene AI reports'
+                          : 'What the sensors report',
                       text: event.description,
                     ),
+                    if (incident.classification case final c?) ...[
+                      const SizedBox(height: 12),
+                      GuidanceCard(classification: c),
+                    ],
                     const SizedBox(height: 14),
-                    const LocatorCard(
+                    LocatorCard(
+                      plan: FloorPlan.bySiteKey(incident.route?.siteKey),
                       mode: FloorPlanMode.incidentRoute,
-                      legend: [
+                      route: incident.route,
+                      focusRoomId: incident.route?.fireZoneId ?? zone.id,
+                      legend: const [
                         LegendItem(AppColors.you, 'You'),
                         LegendItem(AppColors.danger, 'Fire — avoid'),
                         LegendItem(AppColors.safe, 'Fire exit'),
@@ -126,18 +154,29 @@ class _IncidentScreenState extends State<IncidentScreen> {
                         LegendItem(AppColors.safe, 'Safe route'),
                       ],
                     ),
+                    if (incident.route case final r?
+                        when r.instruction.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      _RouteInstruction(route: r),
+                    ],
                     const SizedBox(height: 16),
                     MetaLine(
                       items: [
                         MetaItem('Detected', elapsedAgo(elapsed), isRed: true),
-                        MetaItem('Confidence', '${event.confidencePct}%'),
-                        MetaItem('Type', event.type.label),
+                        // "Confidence 0%" beside a live carbon-monoxide alarm
+                        // looks like a fault. Name the evidence instead.
+                        if (incident.hasMeaningfulConfidence)
+                          MetaItem('Confidence', '${event.confidencePct}%')
+                        else
+                          MetaItem('Evidence', 'Sensors'),
+                        MetaItem('Type', isFire ? event.type.label : 'Gas'),
                       ],
                     ),
                   ],
                 ),
               ),
               _CtaBar(
+                isRefuge: incident.route?.isRefuge ?? false,
                 onSafe: () {
                   // Personal muster check-in (best-effort), then show the
                   // "you're marked safe" screen.
@@ -154,9 +193,14 @@ class _IncidentScreenState extends State<IncidentScreen> {
   }
 }
 
-/// "Live · confirmed emergency" pill with a softly pulsing halo.
+/// The live-status pill with a softly pulsing halo.
+///
+/// The wording tracks the tier: "confirmed emergency" is a claim about evidence,
+/// and a gas alarm has no camera confirmation behind it.
 class _IncidentFlag extends StatefulWidget {
-  const _IncidentFlag();
+  const _IncidentFlag({required this.severity});
+
+  final IncidentSeverity severity;
 
   @override
   State<_IncidentFlag> createState() => _IncidentFlagState();
@@ -227,7 +271,9 @@ class _IncidentFlagState extends State<_IncidentFlag>
               ),
               const SizedBox(width: 7),
               Text(
-                'LIVE · CONFIRMED EMERGENCY',
+                widget.severity == IncidentSeverity.fire
+                    ? 'LIVE · CONFIRMED EMERGENCY'
+                    : 'LIVE · GAS ALARM',
                 style: AppText.pjs(12, 800, color: Colors.white, letterSpacing: 0.72),
               ),
             ],
@@ -238,10 +284,70 @@ class _IncidentFlagState extends State<_IncidentFlag>
   }
 }
 
+/// What actually backs this alarm — never more than that.
+///
+/// This badge used to read "Confirmed by 2 AI checks · object + scene" on every
+/// incident, including the ones where the scene model was unreachable and the
+/// alarm was released on detection evidence alone (Algorithm 2's unavailable
+/// branch), and including gas alarms where there was no image to check at all.
+/// Overstating the evidence is worst precisely where it is most tempting: on the
+/// screen someone reads while deciding whether to believe it.
 class _TrustBadge extends StatelessWidget {
-  const _TrustBadge(this.label);
+  const _TrustBadge({required this.incident});
+
+  final Incident incident;
+
+  ({String label, IconData icon, bool warn}) get _content {
+    if (incident.severity != IncidentSeverity.fire) {
+      return (
+        label: 'Raised by sensor readings · no camera confirmation',
+        icon: Icons.sensors,
+        warn: true,
+      );
+    }
+    return switch (incident.verification) {
+      Verification.confirmed => (
+          label: 'Confirmed by 2 AI checks · object + scene',
+          icon: Icons.verified_user_outlined,
+          warn: false,
+        ),
+      Verification.unavailable => (
+          label: 'Scene check unavailable · camera and sensors only',
+          icon: Icons.cloud_off_outlined,
+          warn: true,
+        ),
+      _ => (
+          label: 'Detection evidence only',
+          icon: Icons.info_outline,
+          warn: true,
+        ),
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _content;
+    final fg = c.warn ? AppColors.warnInk : AppColors.trustInk;
+    final bg = c.warn ? AppColors.warnBg : AppColors.trustBg;
+    final line = c.warn ? AppColors.warn.withValues(alpha: 0.35) : AppColors.trustLine;
+    return _BadgeShell(label: c.label, icon: c.icon, fg: fg, bg: bg, line: line);
+  }
+}
+
+class _BadgeShell extends StatelessWidget {
+  const _BadgeShell({
+    required this.label,
+    required this.icon,
+    required this.fg,
+    required this.bg,
+    required this.line,
+  });
 
   final String label;
+  final IconData icon;
+  final Color fg;
+  final Color bg;
+  final Color line;
 
   @override
   Widget build(BuildContext context) {
@@ -250,22 +356,50 @@ class _TrustBadge extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: AppColors.trustBg,
+          color: bg,
           borderRadius: AppRadii.stadium,
-          border: Border.all(color: AppColors.trustLine),
+          border: Border.all(color: line),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.verified_user_outlined,
-                size: 15, color: AppColors.trustInk),
+            Icon(icon, size: 15, color: fg),
             const SizedBox(width: 8),
             Flexible(
-              child: Text(label, style: AppText.trust.copyWith(color: AppColors.trustInk)),
+              child: Text(label, style: AppText.trust.copyWith(color: fg)),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// "3 people still in the zone" — the most actionable fact on the screen.
+///
+/// Only rendered when the human detector actually has a number. A null count
+/// means it had nothing to say, which is not the same as an empty room, and
+/// printing "0 people" for it would be the one error this figure must not make.
+class _OccupancyLine extends StatelessWidget {
+  const _OccupancyLine({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final people = count == 1 ? '1 person' : '$count people';
+    return Row(
+      children: [
+        const Icon(Icons.groups_outlined, size: 17, color: AppColors.dangerInk),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            count == 0 ? 'No one detected in the zone' : '$people still in the zone',
+            style: AppText.inter(15, 600,
+                color: count == 0 ? AppColors.ink2 : AppColors.dangerInk),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -322,11 +456,61 @@ class _AiReportCard extends StatelessWidget {
   }
 }
 
+/// The one line telling the occupant what to do, in words.
+///
+/// The drawing shows the way; this says it. Under smoke, in the dark, or with a
+/// phone held at arm's length, the sentence is the part that survives.
+class _RouteInstruction extends StatelessWidget {
+  const _RouteInstruction({required this.route});
+
+  final EvacRoute route;
+
+  @override
+  Widget build(BuildContext context) {
+    final refuge = route.isRefuge;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: refuge ? AppColors.warnBg : AppColors.safeBg,
+        borderRadius: const BorderRadius.all(Radius.circular(12)),
+        border: Border.all(
+            color: (refuge ? AppColors.warn : AppColors.safe)
+                .withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(refuge ? Icons.shield_outlined : Icons.directions_walk,
+              size: 18, color: refuge ? AppColors.warnInk : AppColors.safeInk),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              route.instruction,
+              style: AppText.inter(15, 600,
+                  color: refuge ? AppColors.warnInk : AppColors.safeInk,
+                  height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CtaBar extends StatelessWidget {
-  const _CtaBar({required this.onSafe, required this.onCall});
+  const _CtaBar({
+    required this.onSafe,
+    required this.onCall,
+    this.isRefuge = false,
+  });
 
   final VoidCallback onSafe;
   final VoidCallback onCall;
+
+  /// No exit was reachable. Offering "I'm out — I'm safe" to somebody who has
+  /// just been told to shut a door and wait is worse than useless: it invites
+  /// the one action the route generator refused to recommend.
+  final bool isRefuge;
 
   @override
   Widget build(BuildContext context) {
@@ -335,14 +519,18 @@ class _CtaBar extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (!isRefuge) ...[
+            PillButton(
+              label: "I'm out — I'm safe",
+              variant: PillVariant.safe,
+              onPressed: onSafe,
+            ),
+            const SizedBox(height: 10),
+          ],
           PillButton(
-            label: "I'm out — I'm safe",
-            variant: PillVariant.safe,
-            onPressed: onSafe,
-          ),
-          const SizedBox(height: 10),
-          PillButton(
-            label: 'Call emergency services',
+            label: isRefuge
+                ? 'Call emergency services — tell them where you are'
+                : 'Call emergency services',
             variant: PillVariant.danger,
             onPressed: onCall,
           ),

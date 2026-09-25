@@ -98,8 +98,11 @@ class ResolvedScreen extends StatelessWidget {
                                     icon: const FlameIcon(
                                         size: 18, color: AppColors.danger),
                                     title: '${incident.zone.name} · still active',
-                                    subtitle:
-                                        'Fire ${incident.event.confidencePct}% · fire & rescue notified',
+                                    // No percentage: a sensor-raised alarm
+                                    // carries 0.0 by design, and this line is
+                                    // read after someone has already evacuated
+                                    // on the strength of it.
+                                    subtitle: 'Fire & rescue notified',
                                     divider: true,
                                   ),
                                   _StatusRow(

@@ -28,8 +28,34 @@ class NotificationService {
     playSound: true,
   );
 
+  /// A SEPARATE, QUIETER CHANNEL, ON PURPOSE.
+  ///
+  /// Gas sensors react to cooking, aerosols, solvents and vehicle exhaust, so
+  /// gas warnings are the ones that will occasionally be wrong. If they arrived
+  /// on [fireChannel] they would play the fire sound at full volume — and after
+  /// two or three false alarms from someone's frying pan, people mute that
+  /// channel. Muting it silences the *real* fire alert too. A quiet channel for
+  /// the noisy signal is what keeps the loud one worth trusting.
+  ///
+  /// The id must match `fcm.WARNING_CHANNEL_ID` in alert-service exactly. Until
+  /// this channel existed, Android had nowhere to put these and fell back to its
+  /// own default.
+  static const AndroidNotificationChannel gasChannel = AndroidNotificationChannel(
+    'gas_warnings',
+    'Gas warnings',
+    description: 'Sensor readings above normal. Not a fire alarm.',
+    importance: Importance.defaultImportance, // deliberately not .max
+    playSound: false,
+  );
+
   static const String _smallIcon = 'ic_stat_fire';
-  static const int _notifId = 42; // fixed id → a new alert replaces the previous heads-up
+
+  /// SEPARATE IDS PER CHANNEL. With one fixed id, a gas warning arriving during
+  /// a live fire replaced the fire's heads-up — the quiet message evicting the
+  /// loud one. Within a channel the id stays fixed, so a newer alert still
+  /// supersedes an older one of the same kind.
+  static const int _fireNotifId = 42;
+  static const int _gasNotifId = 43;
 
   final FlutterLocalNotificationsPlugin _fln = FlutterLocalNotificationsPlugin();
   ApiFireRepository? _repo;
@@ -52,6 +78,7 @@ class NotificationService {
       final android = _fln.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
       await android?.createNotificationChannel(fireChannel);
+      await android?.createNotificationChannel(gasChannel);
 
       // Permissions: iOS prompt + Android 13+ POST_NOTIFICATIONS.
       await FirebaseMessaging.instance.requestPermission();
@@ -69,34 +96,58 @@ class NotificationService {
       FirebaseMessaging.onMessage.listen(_onForeground);
 
       // Taps that opened/brought the app forward.
-      FirebaseMessaging.onMessageOpenedApp.listen((m) => _openIncident(m.data));
+      FirebaseMessaging.onMessageOpenedApp.listen((m) => _open(m.data));
       final initial = await FirebaseMessaging.instance.getInitialMessage();
       if (initial != null) {
         // Terminated-launch: navigate after the first frame so the router exists.
-        WidgetsBinding.instance.addPostFrameCallback((_) => _openIncident(initial.data));
+        WidgetsBinding.instance.addPostFrameCallback((_) => _open(initial.data));
       }
     } catch (e) {
       debugPrint('[NotificationService] init failed (push disabled): $e');
     }
   }
 
+  /// True when this push is the quiet tier. Everything else — a fire, a
+  /// dangerous-gas alarm, a fuel classification for an open fire — is loud.
+  static bool _isWarning(Map<String, dynamic> data) =>
+      data['type'] == 'gas_warning';
+
+  /// Where a tap on this push should land.
+  static String _routeFor(Map<String, dynamic> data) =>
+      _isWarning(data) ? '/warning' : '/incident';
+
   Future<void> _onForeground(RemoteMessage msg) async {
-    await _repo?.refresh(); // dashboard reflects the fire immediately
+    await _repo?.refresh(); // dashboard reflects the event immediately
     final n = msg.notification;
+    final warning = _isWarning(msg.data);
+
+    // THE CHANNEL IS CHOSEN FROM THE PAYLOAD, NOT FIXED. Previously every
+    // foreground message was re-shown on the fire channel at Importance.max
+    // with category: alarm — so a gas warning that was carefully sent quietly
+    // by the backend arrived on the phone sounding exactly like a fire.
+    final channel = warning ? gasChannel : fireChannel;
     await _fln.show(
-      id: _notifId,
-      title: n?.title ?? '🔥 Fire detected',
-      body: n?.body ?? 'Two AI checks confirmed flames. Tap for your safe route.',
+      id: warning ? _gasNotifId : _fireNotifId,
+      title: n?.title ?? (warning ? '⚠️ Gas levels rising' : '🔥 Fire detected'),
+      body: n?.body ??
+          (warning
+              ? 'Sensor readings are above normal. No fire seen on camera.'
+              : 'Tap for your safe route.'),
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
-          fireChannel.id,
-          fireChannel.name,
-          channelDescription: fireChannel.description,
-          importance: Importance.max,
-          priority: Priority.max,
+          channel.id,
+          channel.name,
+          channelDescription: channel.description,
+          importance: warning ? Importance.defaultImportance : Importance.max,
+          priority: warning ? Priority.defaultPriority : Priority.max,
           icon: _smallIcon,
-          color: const Color(0xFFFF3B30),
-          category: AndroidNotificationCategory.alarm,
+          color: warning ? const Color(0xFFF59E0B) : const Color(0xFFFF3B30),
+          // `alarm` makes Android treat it as an emergency (full volume, and it
+          // can pierce Do Not Disturb). A warning is a status message.
+          category: warning
+              ? AndroidNotificationCategory.status
+              : AndroidNotificationCategory.alarm,
+          playSound: !warning,
           visibility: NotificationVisibility.public,
         ),
       ),
@@ -108,17 +159,28 @@ class NotificationService {
     final payload = resp.payload;
     if (payload == null || payload.isEmpty) return;
     try {
-      _openIncident((jsonDecode(payload) as Map).cast<String, dynamic>());
+      _open((jsonDecode(payload) as Map).cast<String, dynamic>());
     } catch (_) {/* ignore malformed payload */}
   }
 
-  Future<void> _openIncident(Map<String, dynamic> data) async {
+  /// Load whatever this push refers to, then navigate.
+  ///
+  /// A `fire_classified` push carries the SAME `incidentId` as the `fire_alert`
+  /// before it — it is the same fire with better information, not a second one.
+  /// Looking the id up rather than building a new incident from the payload is
+  /// what keeps one fire from becoming two on the screen.
+  ///
+  /// FCM does not guarantee ordering, so a classification can arrive before the
+  /// alert it belongs to. That is fine: the id fetch below pulls the whole
+  /// incident, and the payload is only ever a fallback for when the network is
+  /// down at exactly that moment.
+  Future<void> _open(Map<String, dynamic> data) async {
     final id = (data['incidentId'] as String?) ?? '';
     if (id.isNotEmpty) {
       await _repo?.loadIncident(id, fallbackData: data);
     } else {
       _repo?.applyFcmData(data);
     }
-    _router?.go('/incident');
+    _router?.go(_routeFor(data));
   }
 }

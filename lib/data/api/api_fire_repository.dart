@@ -31,6 +31,7 @@ class ApiFireRepository extends FireRepository {
   List<HistoryEvent> _history = const [];
   late Incident _active;
   bool _allClear = true;
+  String _siteKey = 'unit7';
   Timer? _poll;
 
   // ── FireRepository surface (synchronous reads) ─────────────────────────────
@@ -49,6 +50,9 @@ class ApiFireRepository extends FireRepository {
   bool get allClear => _allClear;
   @override
   int get detectorCount => _zones.length;
+
+  @override
+  String get siteKey => _siteKey;
 
   @override
   Zone? zoneById(String id) {
@@ -71,8 +75,25 @@ class ApiFireRepository extends FireRepository {
   /// Initial fetch + start the background poll. Safe to call once at startup;
   /// never throws (a dead backend just leaves the seeded snapshot in place).
   Future<void> init() async {
+    await _loadSite();
     await refresh();
     _poll ??= Timer.periodic(_pollInterval, (_) => refresh());
+  }
+
+  /// Ask which facility the backend is routing for. Fetched once, not polled:
+  /// a building does not change while the app is open. Never throws — with no
+  /// backend the seeded demo site is exactly the right fallback.
+  Future<void> _loadSite() async {
+    try {
+      final plan = await _api.getSitePlan();
+      final key = plan['siteKey'] as String?;
+      if (key != null && key.isNotEmpty) {
+        _siteKey = key;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('[ApiFireRepository] site plan fetch failed: $e');
+    }
   }
 
   /// Re-fetch state + history. Called by the poll and by the push handler.
@@ -168,22 +189,57 @@ class ApiFireRepository extends FireRepository {
         : _placeholder(_zones.isNotEmpty ? _zones.first : MockData.zones(DateTime.now()).first);
   }
 
+  /// Build a best-effort incident from an FCM `data` payload, for when the
+  /// network is down at the moment the push lands.
+  ///
+  /// Every value on an FCM payload is a **string**, including the numbers, and
+  /// an unknown one is sent as `""` rather than `"None"` — so `tryParse` failing
+  /// is the normal "we don't know" case, not an error.
   Incident _fromFcmData(Map<String, dynamic> d) {
     final zoneId = (d['zoneId'] as String?) ?? _zones.first.id;
     final zone = zoneById(zoneId) ?? _zones.first;
+    final severity = IncidentSeverity.fromWire(d['severity'] as String?);
     final event = DetectionEvent(
       zoneId: zoneId,
       type: DetectionType.fromWire(d['detectionType'] as String?),
       detected: true,
-      confidence: double.tryParse('${d['confidence']}') ?? 0.9,
+      // Do NOT default a missing confidence to 0.9 for a sensor-only alarm:
+      // tier 1b legitimately carries 0.0, and inventing a figure for it is what
+      // the screen is now careful not to display in the first place.
+      confidence: double.tryParse('${d['confidence']}') ??
+          (severity == IncidentSeverity.fire ? 0.9 : 0.0),
       description: (d['description'] as String?) ?? '',
       detectedAt: DateTime.tryParse('${d['detectedAt']}')?.toLocal() ?? DateTime.now(),
     );
+    final occupancy = int.tryParse('${d['occupancy']}');
     return Incident(
       id: (d['incidentId'] as String?) ?? '',
       zone: zone,
       event: event,
       muster: const MusterRoll(present: 42, total: 45),
+      severity: severity,
+      verification: Verification.fromWire(d['verification'] as String?),
+      occupancy: Occupancy(current: occupancy, peak: occupancy),
+      classification: _classificationFromFcm(d),
+      sensorSummary: (d['sensors'] as String?) ?? '',
+      route: EvacRoute.fromFcm(d),
+    );
+  }
+
+  /// A `fire_classified` push carries the fuel verdict inline, so the guidance
+  /// can be shown without a round trip. The sentence is used exactly as sent —
+  /// it comes from the backend's one guidance table.
+  FireClassification? _classificationFromFcm(Map<String, dynamic> d) {
+    final fuel = (d['fuelType'] as String?) ?? '';
+    final guidance = (d['fuelGuidance'] as String?) ?? '';
+    if (fuel.isEmpty && guidance.isEmpty) return null;
+    return FireClassification(
+      fuelType: fuel.isEmpty ? null : fuel,
+      label: (d['fuelLabel'] as String?) ?? 'Fire',
+      guidance: guidance,
+      source: fuel.isEmpty ? 'unavailable' : 'model',
+      confidence: double.tryParse('${d['fuelConfidence']}'),
+      trainedOn: 'simulation',
     );
   }
 
