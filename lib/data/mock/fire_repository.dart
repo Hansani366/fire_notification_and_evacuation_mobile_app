@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
 
+import '../../core/config/app_config.dart';
+
 import '../models/models.dart';
 import 'mock_data.dart';
 
@@ -37,6 +39,14 @@ abstract class FireRepository extends ChangeNotifier {
 
   int get detectorCount;
 
+  /// Which floor plan to draw escape routes on.
+  ///
+  /// This is the phone's OWN setting (`AppConfig.exitLayout`), not the backend's
+  /// [siteKey]. The two are independent on purpose: the dashboard has its own
+  /// switch for what counts as a fire, and this one chooses the layout a
+  /// responder sees. Neither reads the other.
+  String get exitLayout => AppConfig.exitLayout;
+
   /// Which facility drawing to pair a route with.
   ///
   /// The backend owns the graph and the app owns the artwork, so this is the
@@ -47,6 +57,12 @@ abstract class FireRepository extends ChangeNotifier {
   /// Personal "I'm safe" muster check-in for the active incident.
   /// No-op in the mock; the live repository posts it to the backend.
   Future<void> ackSafe() async {}
+
+  /// Tell listeners the local layout choice changed.
+  ///
+  /// The setting lives in [AppConfig], but screens read the repository, so the
+  /// repository is what has to announce it.
+  void notifyLayoutChanged() => notifyListeners();
 
   /// Re-fetch live state. No-op in the mock; the live repository hits the API.
   Future<void> refresh() async {}

@@ -13,6 +13,7 @@ import '../../shared/widgets/health_row.dart';
 import '../../shared/widgets/section_label.dart';
 import '../../shared/widgets/status_hero.dart';
 import '../../shared/widgets/zone_card.dart';
+import 'widgets/layout_switch.dart';
 
 /// Flow B home: site status (live "All clear" or a fire banner), system health,
 /// and the zone list. Rebuilds automatically as the live repository updates.
@@ -71,6 +72,8 @@ class DashboardScreen extends StatelessWidget {
                   incident.severity == IncidentSeverity.warning ? '/warning' : '/incident'),
             ),
           const SizedBox(height: 16),
+          const LayoutSwitch(),
+          const SizedBox(height: 14),
           HealthRow(stats: repo.health),
           const SizedBox(height: 6),
           SectionLabel(label: 'Zones', trailing: '${zones.length}'),

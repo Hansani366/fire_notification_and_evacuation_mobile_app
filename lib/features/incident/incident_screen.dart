@@ -72,6 +72,20 @@ class _IncidentScreenState extends State<IncidentScreen> {
     final isFire = incident.severity == IncidentSeverity.fire;
     final occupants = incident.occupancy.current;
 
+    // The layout is this phone's own setting; the route was generated against
+    // whatever building the backend is configured for. Usually the same, but
+    // they are set independently and can disagree.
+    //
+    // A polyline only means anything in the coordinate space it was computed in,
+    // so when they disagree the route is NOT drawn on the other building's plan.
+    // A correct path through the wrong walls is worse than no path: it looks
+    // exactly as authoritative and leads somewhere that does not exist.
+    final plan = FloorPlan.bySiteKey(RepositoryScope.of(context).exitLayout);
+    final route = incident.route;
+    final layoutMatches = route == null || route.siteKey.isEmpty ||
+        route.siteKey == plan.siteKey;
+    final drawableRoute = layoutMatches ? route : null;
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark,
       child: Scaffold(
@@ -146,11 +160,20 @@ class _IncidentScreenState extends State<IncidentScreen> {
                       GuidanceCard(classification: c),
                     ],
                     const SizedBox(height: 14),
+                    if (!layoutMatches) ...[
+                      _LayoutMismatch(routeSite: route.siteKey),
+                      const SizedBox(height: 10),
+                    ],
                     LocatorCard(
-                      plan: FloorPlan.bySiteKey(incident.route?.siteKey),
-                      mode: FloorPlanMode.incidentRoute,
-                      route: incident.route,
-                      focusRoomId: incident.route?.fireZoneId ?? zone.id,
+                      plan: plan,
+                      // Without a usable route there is nothing to march along,
+                      // so the plan is drawn plainly rather than with a stale
+                      // demonstration path over it.
+                      mode: drawableRoute == null && !layoutMatches
+                          ? FloorPlanMode.zoneSafe
+                          : FloorPlanMode.incidentRoute,
+                      route: drawableRoute,
+                      focusRoomId: drawableRoute?.fireZoneId ?? zone.id,
                       legend: const [
                         LegendItem(AppColors.you, 'You'),
                         LegendItem(AppColors.danger, 'Fire — avoid'),
@@ -161,7 +184,7 @@ class _IncidentScreenState extends State<IncidentScreen> {
                         LegendItem(AppColors.safe, 'Safe route'),
                       ],
                     ),
-                    if (incident.route case final r?
+                    if (drawableRoute case final r?
                         when r.instruction.isNotEmpty) ...[
                       const SizedBox(height: 12),
                       _RouteInstruction(route: r),
@@ -183,7 +206,7 @@ class _IncidentScreenState extends State<IncidentScreen> {
                 ),
               ),
               _CtaBar(
-                isRefuge: incident.route?.isRefuge ?? false,
+                isRefuge: drawableRoute?.isRefuge ?? false,
                 onSafe: () {
                   // Personal muster check-in (best-effort), then show the
                   // "you're marked safe" screen.
@@ -377,6 +400,44 @@ class _BadgeShell extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Says plainly that the route cannot be drawn, and why.
+///
+/// The alternative — quietly falling back to the plan's stock route — would put
+/// a confident-looking path on screen that nobody generated for this fire.
+class _LayoutMismatch extends StatelessWidget {
+  const _LayoutMismatch({required this.routeSite});
+
+  final String routeSite;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = routeSite == 'home' ? 'Home demo' : 'Industrial';
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: AppColors.warnBg,
+        borderRadius: const BorderRadius.all(Radius.circular(12)),
+        border: Border.all(color: AppColors.warn.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.layers_clear_outlined, size: 17, color: AppColors.warnInk),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              'No route shown. This alert was generated for the "$name" layout, '
+              'and this phone is set to a different one. Switch the escape route '
+              'layout on the site status screen.',
+              style: AppText.inter(13, 500, color: AppColors.warnInk, height: 1.4),
+            ),
+          ),
+        ],
       ),
     );
   }

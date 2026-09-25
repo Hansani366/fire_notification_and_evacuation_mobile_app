@@ -14,6 +14,7 @@ class AppConfig {
 
   static const String _prefsKey = 'api_base_url';
   static const String _tokenKey = 'fcm_token';
+  static const String _layoutKey = 'exit_layout';
 
   static const String _envBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
@@ -33,6 +34,8 @@ class AppConfig {
       if (saved != null && saved.trim().isNotEmpty) {
         _baseUrl = _normalise(saved);
       }
+      final layout = prefs.getString(_layoutKey);
+      if (layout == 'home' || layout == 'unit7') _exitLayout = layout!;
     } catch (_) {
       // Non-fatal: fall back to the compile-time default.
     }
@@ -67,6 +70,30 @@ class AppConfig {
       return prefs.getString(_tokenKey);
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Which building's escape-route layout to draw: `unit7` or `home`.
+  ///
+  /// DELIBERATELY A LOCAL SETTING, NOT ONE THE BACKEND SUPPLIES. The dashboard
+  /// has its own switch for what counts as a fire; this one chooses which floor
+  /// plan the phone draws. They are set independently and neither reads the
+  /// other, so a phone can be pointed at a different layout without touching the
+  /// server, and a server restart cannot silently change what a responder sees.
+  ///
+  /// Defaults to `unit7`, which is also what a phone with no stored preference
+  /// and no backend shows.
+  static String _exitLayout = 'unit7';
+
+  static String get exitLayout => _exitLayout;
+
+  static Future<void> setExitLayout(String key) async {
+    _exitLayout = key == 'home' ? 'home' : 'unit7';
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_layoutKey, _exitLayout);
+    } catch (_) {
+      // Non-fatal: the choice holds for this run, just not the next one.
     }
   }
 
