@@ -1,3 +1,5 @@
+![FireWatch: a fire notification and evacuation research prototype. A phone shows a confirmed fire alert above a floor plan, with the escape route drawn from the user's position past the burning room to the nearest exit, and an "I am safe" button below it. Beside the phone, an isometric cutaway of the same floor shows occupants following that route.](docs/mobile_app_cover_image.png)
+
 # FireWatch — fire notification and evacuation mobile app
 
 ## 1. Overview
