@@ -13,6 +13,7 @@ class AppConfig {
   AppConfig._();
 
   static const String _prefsKey = 'api_base_url';
+  static const String _tokenKey = 'fcm_token';
 
   static const String _envBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
@@ -42,6 +43,31 @@ class AppConfig {
     _baseUrl = _normalise(url);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_prefsKey, _baseUrl);
+  }
+
+  /// This device's FCM token, cached so the **background isolate** can reach it.
+  ///
+  /// A push that arrives while the app is terminated is handled in a separate
+  /// isolate with none of `main()`'s state — no repository, no Firebase, no
+  /// loaded config. That is also the case where delivery timing matters most,
+  /// because it is the one a sleeping person actually experiences. Persisting
+  /// the token is what lets that isolate acknowledge the push at all.
+  static Future<void> saveDeviceToken(String token) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_tokenKey, token);
+    } catch (_) {
+      // Non-fatal: only the background acknowledgement is lost.
+    }
+  }
+
+  static Future<String?> deviceToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_tokenKey);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Build a request URI for a backend path like `/api/state`.

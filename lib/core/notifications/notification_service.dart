@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -5,14 +6,41 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/api/api_client.dart';
 import '../../data/api/api_fire_repository.dart';
+import '../config/app_config.dart';
 
 /// Background/terminated FCM handler. Must be a top-level, vm-entry-point
-/// function. Our messages carry a `notification` block, so Android shows the
-/// tray/heads-up automatically here — nothing to do but exist and be registered
-/// (in `main()`, before `runApp`).
+/// function. Our messages carry a `notification` block, so Android draws the
+/// tray/heads-up itself — the only work here is closing the delivery round trip.
+///
+/// This runs in a SEPARATE ISOLATE with none of `main()`'s state: no repository,
+/// no router, no loaded config. So it reads the base URL and the device token
+/// back from shared_preferences and posts directly. It is also the case that
+/// matters most for Table 3.19 — an alert arriving on a phone in somebody's
+/// pocket at night is the delivery the whole measurement is about, and it is the
+/// one a foreground-only acknowledgement would never see.
+///
+/// Everything is wrapped: a failure here must never take down the handler that
+/// Android relies on to deliver the notification.
 @pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {}
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  try {
+    final id = (message.data['incidentId'] as String?) ?? '';
+    if (id.isEmpty) return;
+    await AppConfig.load();
+    final token = await AppConfig.deviceToken();
+    if (token == null) return;
+    final api = ApiClient();
+    try {
+      await api.reportDelivered(id, token, state: 'background');
+    } finally {
+      api.close();
+    }
+  } catch (e) {
+    debugPrint('[fcm-bg] delivery report failed: $e');
+  }
+}
 
 /// Wires FCM + local notifications into the app: registers the device token,
 /// shows a heads-up on foreground alerts, and deep-links a tap to `/incident`.
@@ -87,10 +115,13 @@ class NotificationService {
       // Register this device's token, and keep it fresh.
       final token = await FirebaseMessaging.instance.getToken();
       if (token != null) {
+        await AppConfig.saveDeviceToken(token);
         await _repo?.registerToken(token, label: 'FireWatch app');
       }
-      FirebaseMessaging.instance.onTokenRefresh
-          .listen((t) => _repo?.registerToken(t, label: 'FireWatch app'));
+      FirebaseMessaging.instance.onTokenRefresh.listen((t) async {
+        await AppConfig.saveDeviceToken(t);
+        await _repo?.registerToken(t, label: 'FireWatch app');
+      });
 
       // Foreground alerts: build a heads-up ourselves + refresh state.
       FirebaseMessaging.onMessage.listen(_onForeground);
@@ -117,6 +148,9 @@ class NotificationService {
       _isWarning(data) ? '/warning' : '/incident';
 
   Future<void> _onForeground(RemoteMessage msg) async {
+    // Acknowledge first and without awaiting: this is instrumentation, and it
+    // must not sit in front of the refresh that puts the fire on screen.
+    _ack(msg.data, 'foreground');
     await _repo?.refresh(); // dashboard reflects the event immediately
     final n = msg.notification;
     final warning = _isWarning(msg.data);
@@ -174,7 +208,19 @@ class NotificationService {
   /// alert it belongs to. That is fine: the id fetch below pulls the whole
   /// incident, and the payload is only ever a fallback for when the network is
   /// down at exactly that moment.
+  /// Close the delivery round trip, fire and forget.
+  void _ack(Map<String, dynamic> data, String state) {
+    final id = (data['incidentId'] as String?) ?? '';
+    if (id.isEmpty) return;
+    unawaited(_repo?.reportDelivered(id, state: state) ?? Future<void>.value());
+  }
+
   Future<void> _open(Map<String, dynamic> data) async {
+    // A tap is also an arrival, and for a message the app never saw in the
+    // foreground it may be the only one that gets recorded. The backend keeps
+    // whichever acknowledgement lands first, so this cannot inflate a figure
+    // that a faster path already closed.
+    _ack(data, 'opened');
     final id = (data['incidentId'] as String?) ?? '';
     if (id.isNotEmpty) {
       await _repo?.loadIncident(id, fallbackData: data);

@@ -6,6 +6,7 @@ import '../../features/history/history_screen.dart';
 import '../../features/history_detail/history_detail_screen.dart';
 import '../../features/incident/incident_screen.dart';
 import '../../features/lock/lock_screen.dart';
+import '../../features/report/report_screen.dart';
 import '../../features/warning/warning_screen.dart';
 import '../../features/resolved/resolved_screen.dart';
 import '../../features/zone_detail/zone_detail_screen.dart';
@@ -50,6 +51,12 @@ GoRouter buildRouter({GlobalKey<NavigatorState>? navigatorKey}) => GoRouter(
           path: '/history-detail/:id',
           builder: (context, state) =>
               HistoryDetailScreen(eventId: state.pathParameters['id']!),
+        ),
+        // Read after the fact, so it is a pushed page rather than a takeover.
+        GoRoute(
+          path: '/report/:id',
+          builder: (context, state) =>
+              ReportScreen(incidentId: state.pathParameters['id']!),
         ),
         GoRoute(
           path: '/lock',

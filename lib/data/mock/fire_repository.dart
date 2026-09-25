@@ -50,6 +50,17 @@ abstract class FireRepository extends ChangeNotifier {
 
   /// Re-fetch live state. No-op in the mock; the live repository hits the API.
   Future<void> refresh() async {}
+
+  /// The record of a past incident, once [loadReport] has fetched it.
+  ///
+  /// Reports are fetched into the snapshot rather than awaited in a screen, so
+  /// the "screens read the repository synchronously" rule holds for this screen
+  /// too — no `FutureBuilder`, no async in `build`. Null simply means "not here
+  /// yet", which the screen renders as a loading state.
+  IncidentReport? reportFor(String incidentId) => null;
+
+  /// Fetch one incident report. No-op in the mock.
+  Future<void> loadReport(String incidentId) async {}
 }
 
 /// In-memory implementation seeded from [MockData]. Used for widget tests and

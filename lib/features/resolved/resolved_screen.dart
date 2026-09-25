@@ -5,10 +5,35 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/theme/app_typography.dart';
 import '../../data/mock/fire_repository.dart';
+import '../../data/models/models.dart';
 import '../../shared/widgets/flame_icon.dart';
 import '../../shared/widgets/greeting_app_bar.dart';
 import '../../shared/widgets/pill_button.dart';
 import '../../shared/widgets/surface_card.dart';
+
+/// How many people have said they are out.
+String _checkedOutTitle(CheckoutRoll c) {
+  final n = c.checkedOut;
+  final who = n == 1 ? '1 person' : '$n people';
+  return c.isKnown
+      ? 'Checked out · $who of ${c.peakOccupancy}'
+      : 'Checked out · $who';
+}
+
+/// The gap between the two counts, stated rather than reconciled.
+///
+/// An unknown head-count says so. It used to read as everyone being accounted
+/// for, which is the one error this line must never make: "we lost the camera"
+/// and "the building is empty" look identical on a screen and mean opposite
+/// things.
+String _checkedOutSubtitle(CheckoutRoll c) {
+  if (!c.isKnown) {
+    return 'Head-count unavailable — the camera had nothing to report';
+  }
+  final left = c.unaccounted ?? 0;
+  if (left == 0) return 'Everyone the camera saw has checked out';
+  return '$left not yet accounted for · camera head-count, counted separately';
+}
 
 /// Flow A end state: the user is accounted for at the muster point, while the
 /// incident stays active for anyone still inside.
@@ -34,7 +59,7 @@ class ResolvedScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final incident = RepositoryScope.of(context).activeIncident;
-    final muster = incident.muster;
+    final checkout = incident.checkout;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark,
@@ -110,10 +135,8 @@ class ResolvedScreen extends StatelessWidget {
                                     fg: AppColors.safe,
                                     icon: const Icon(Icons.person_outline,
                                         size: 18, color: AppColors.safe),
-                                    title:
-                                        'Muster roll · ${muster.present} of ${muster.total}',
-                                    subtitle:
-                                        '${muster.missing} workers not yet checked in',
+                                    title: _checkedOutTitle(checkout),
+                                    subtitle: _checkedOutSubtitle(checkout),
                                   ),
                                 ],
                               ),

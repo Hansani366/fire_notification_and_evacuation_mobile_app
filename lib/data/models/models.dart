@@ -546,6 +546,50 @@ class EvacRoute {
       Object.hashAll(polyline), Object.hashAll(blockedExitIds));
 }
 
+/// Who has said they are out, next to what the camera can still see.
+///
+/// TWO INSTRUMENTS, NOT ONE NUMBER. [checkedOut] is people who tapped; the
+/// occupancy figures are what one camera can see. They measure the same
+/// evacuation and they will disagree, and the disagreement is the point — it is
+/// how you find out the camera missed somebody behind a rack, or is counting a
+/// coat on a chair. Neither is corrected against the other.
+class CheckoutRoll {
+  const CheckoutRoll({
+    this.checkedOut = 0,
+    this.peakOccupancy,
+    this.currentOccupancy,
+    this.unaccounted,
+  });
+
+  final int checkedOut;
+  final int? peakOccupancy;
+  final int? currentOccupancy;
+
+  /// Peak head-count minus check-outs, or null when the camera never had a
+  /// number. Null must never render as "everybody is out".
+  final int? unaccounted;
+
+  bool get isKnown => peakOccupancy != null;
+
+  factory CheckoutRoll.fromJson(Map<String, dynamic>? j) {
+    if (j == null) return const CheckoutRoll();
+    return CheckoutRoll(
+      checkedOut: _asInt(j['checkedOut']),
+      peakOccupancy: j['peakOccupancy'] == null ? null : _asInt(j['peakOccupancy']),
+      currentOccupancy:
+          j['currentOccupancy'] == null ? null : _asInt(j['currentOccupancy']),
+      unaccounted: j['unaccounted'] == null ? null : _asInt(j['unaccounted']),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'checkedOut': checkedOut,
+        'peakOccupancy': peakOccupancy,
+        'currentOccupancy': currentOccupancy,
+        'unaccounted': unaccounted,
+      };
+}
+
 /// An active, confirmed emergency (drives the incident + resolved screens).
 class Incident {
   const Incident({
@@ -559,6 +603,7 @@ class Incident {
     this.classification,
     this.sensorSummary = '',
     this.route,
+    this.checkout = const CheckoutRoll(),
   });
 
   final String id;
@@ -583,6 +628,10 @@ class Incident {
   /// incident from before routing existed, or generation failed. Null renders as
   /// the plan with no overlays, a path the drawing already had.
   final EvacRoute? route;
+
+  /// Check-out progress, kept separate from [muster] on purpose — see
+  /// [CheckoutRoll].
+  final CheckoutRoll checkout;
 
   /// True for the neutral stand-in the repository holds so `activeIncident` is
   /// never null. The dashboard needs this because the backend deliberately
@@ -612,6 +661,7 @@ class Incident {
         route: j['route'] == null
             ? null
             : EvacRoute.fromJson(j['route'] as Map<String, dynamic>),
+        checkout: CheckoutRoll.fromJson(j['checkout'] as Map<String, dynamic>?),
         classification: j['classification'] == null
             ? null
             : FireClassification.fromJson(
@@ -628,6 +678,7 @@ class Incident {
         'occupancy': occupancy.toJson(),
         'classification': classification?.toJson(),
         'sensorSummary': sensorSummary,
+        'checkout': checkout.toJson(),
       };
 }
 
@@ -711,6 +762,106 @@ class HistoryEvent {
         'cause': cause,
         'sceneNotes': sceneNotes.map((n) => n.toJson()).toList(),
       };
+}
+
+/// One stamp on the incident timeline.
+class ReportEvent {
+  const ReportEvent({required this.at, required this.what, this.detail = ''});
+
+  final DateTime? at;
+  final String what;
+  final String detail;
+
+  factory ReportEvent.fromJson(Map<String, dynamic> j) => ReportEvent(
+        at: j['at'] == null ? null : DateTime.tryParse('${j['at']}')?.toLocal(),
+        what: j['what'] as String? ?? '',
+        detail: j['detail'] as String? ?? '',
+      );
+}
+
+/// The record of one incident, read after it is over.
+///
+/// Deliberately a different shape from [Incident]. A responder wants to know
+/// what is burning; an investigation wants to know **when the system knew it**,
+/// and the gaps between the stamps are the answer. `warningToFireS` in
+/// particular is the measured notice the sensors gave before anything was
+/// visible — which is the entire justification for the warning tier, and it is
+/// lost the moment the incident closes unless it is read from here.
+class IncidentReport {
+  const IncidentReport({
+    required this.id,
+    required this.zoneName,
+    required this.severity,
+    this.escalatedFromWarning = false,
+    this.fuelLabel,
+    this.guidance = '',
+    this.timeline = const [],
+    this.warningToFireS,
+    this.fireToClassifiedS,
+    this.totalS,
+    this.checkout = const CheckoutRoll(),
+    this.deliveryP50Ms,
+    this.deliveryP95Ms,
+    this.routeExitName,
+    this.routeLengthM,
+    this.routeLatencyMs,
+    this.caveats = const [],
+  });
+
+  final String id;
+  final String zoneName;
+  final IncidentSeverity severity;
+  final bool escalatedFromWarning;
+  final String? fuelLabel;
+  final String guidance;
+  final List<ReportEvent> timeline;
+
+  /// Seconds of notice the sensors gave before a flame was visible.
+  final int? warningToFireS;
+  final int? fireToClassifiedS;
+  final int? totalS;
+
+  final CheckoutRoll checkout;
+  final double? deliveryP50Ms;
+  final double? deliveryP95Ms;
+  final String? routeExitName;
+  final double? routeLengthM;
+  final double? routeLatencyMs;
+  final List<String> caveats;
+
+  static int? _optInt(dynamic v) => v == null ? null : _asInt(v);
+  static double? _optDouble(dynamic v) => v == null ? null : _asDouble(v);
+
+  factory IncidentReport.fromJson(Map<String, dynamic> j) {
+    final durations = j['durations'] as Map<String, dynamic>? ?? const {};
+    final delivery = j['delivery'] as Map<String, dynamic>? ?? const {};
+    final classification = j['classification'] as Map<String, dynamic>?;
+    final route = j['route'] as Map<String, dynamic>?;
+    final zone = j['zone'] as Map<String, dynamic>? ?? const {};
+    return IncidentReport(
+      id: j['id'] as String? ?? '',
+      zoneName: zone['name'] as String? ?? '',
+      severity: IncidentSeverity.fromWire(j['severity'] as String?),
+      escalatedFromWarning: j['escalatedFromWarning'] as bool? ?? false,
+      fuelLabel: classification?['label'] as String?,
+      guidance: classification?['guidance'] as String? ?? '',
+      timeline: (j['timeline'] as List<dynamic>? ?? const [])
+          .map((e) => ReportEvent.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      warningToFireS: _optInt(durations['warningToFireS']),
+      fireToClassifiedS: _optInt(durations['fireToClassifiedS']),
+      totalS: _optInt(durations['totalS']),
+      checkout: CheckoutRoll.fromJson(j['checkout'] as Map<String, dynamic>?),
+      deliveryP50Ms: _optDouble(delivery['p50Ms']),
+      deliveryP95Ms: _optDouble(delivery['p95Ms']),
+      routeExitName: route?['exitName'] as String?,
+      routeLengthM: _optDouble(route?['lengthM']),
+      routeLatencyMs: _optDouble(j['routeLatencyMs']),
+      caveats: (j['caveats'] as List<dynamic>? ?? const [])
+          .map((e) => '$e')
+          .toList(),
+    );
+  }
 }
 
 /// A dashboard system-health tile.

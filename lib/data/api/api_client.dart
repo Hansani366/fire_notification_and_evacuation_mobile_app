@@ -40,6 +40,38 @@ class ApiClient {
     _ok(res);
   }
 
+  /// Mark one occupant out of the building.
+  ///
+  /// The token is what makes the count idempotent: a double tap, a reopened
+  /// notification and a retried request are all the same person. Returns the
+  /// backend's running total, or null if it did not say.
+  Future<int?> checkout(String id, String token) async {
+    final res = await _client
+        .post(AppConfig.api('/api/incidents/$id/checkout'),
+            headers: _jsonHeaders, body: jsonEncode({'token': token}))
+        .timeout(_timeout);
+    final data = jsonDecode(_ok(res));
+    return data is Map && data['checkedOut'] is num
+        ? (data['checkedOut'] as num).toInt()
+        : null;
+  }
+
+  /// Acknowledge that a push arrived, closing the delivery round trip.
+  ///
+  /// Deliberately short-timeout and fire-and-forget at the call site: this is
+  /// instrumentation, and it must never delay showing somebody a fire alert.
+  Future<void> reportDelivered(String id, String token, {String? state}) async {
+    await _client
+        .post(AppConfig.api('/api/incidents/$id/delivered'),
+            headers: _jsonHeaders,
+            body: jsonEncode({'token': token, 'state': state}))
+        .timeout(const Duration(seconds: 5));
+  }
+
+  /// The incident record, read after the event rather than during it.
+  Future<Map<String, dynamic>> getReport(String id) async => _decodeMap(
+      await _client.get(AppConfig.api('/api/incidents/$id/report')).timeout(_timeout));
+
   Future<void> ackIncident(String id) async {
     final res = await _client
         .post(AppConfig.api('/api/incidents/$id/ack'), headers: _jsonHeaders)

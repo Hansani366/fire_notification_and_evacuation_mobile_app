@@ -29,9 +29,14 @@ class ApiFireRepository extends FireRepository {
   late List<Zone> _zones;
   List<HealthStat> _health = MockData.health;
   List<HistoryEvent> _history = const [];
+  final Map<String, IncidentReport> _reports = {};
   late Incident _active;
   bool _allClear = true;
   String _siteKey = 'unit7';
+
+  /// This device's FCM token, kept so a check-out can be attributed to one
+  /// handset and therefore counted exactly once.
+  String? _token;
   Timer? _poll;
 
   // ── FireRepository surface (synchronous reads) ─────────────────────────────
@@ -114,6 +119,26 @@ class ApiFireRepository extends FireRepository {
     notifyListeners();
   }
 
+  @override
+  IncidentReport? reportFor(String incidentId) => _reports[incidentId];
+
+  /// Fetch one incident report into the snapshot.
+  ///
+  /// Cached: a report describes a closed incident and does not change, so
+  /// re-entering the screen should not re-fetch. Never throws — a failure leaves
+  /// the screen on its loading state rather than taking it down.
+  @override
+  Future<void> loadReport(String incidentId) async {
+    if (incidentId.isEmpty || _reports.containsKey(incidentId)) return;
+    try {
+      _reports[incidentId] =
+          IncidentReport.fromJson(await _api.getReport(incidentId));
+      notifyListeners();
+    } catch (e) {
+      debugPrint('[ApiFireRepository] loadReport failed: $e');
+    }
+  }
+
   /// Load a specific incident (on notification tap) so `/incident` shows it.
   /// If the network fails, falls back to building the incident from the FCM
   /// data payload so the screen still renders offline.
@@ -139,20 +164,49 @@ class ApiFireRepository extends FireRepository {
   }
 
   Future<void> registerToken(String token, {String? label}) async {
+    _token = token;
     try {
       await _api.registerDevice(token, label: label);
     } catch (e) {
+      // Keep the token even if registration failed — the backend may already
+      // know it from a previous run, and a check-out still needs an identity.
       debugPrint('[ApiFireRepository] registerToken failed: $e');
     }
   }
 
-  /// Personal "I'm safe" muster check-in for the active incident.
+  /// Close the delivery round trip for a push that just arrived.
+  ///
+  /// Instrumentation, so it is fire-and-forget and never blocks showing the
+  /// alert. Silence here costs a data point; a delay here costs seconds in front
+  /// of somebody who needs to start walking.
+  Future<void> reportDelivered(String incidentId, {String? state}) async {
+    final token = _token;
+    if (token == null || incidentId.isEmpty) return;
+    try {
+      await _api.reportDelivered(incidentId, token, state: state);
+    } catch (e) {
+      debugPrint('[ApiFireRepository] reportDelivered failed: $e');
+    }
+  }
+
+  /// Personal "I'm out" check-out for the active incident.
+  ///
+  /// Posted with this device's token so the backend counts it once however many
+  /// times it arrives — a double tap under stress, a reopened notification, a
+  /// retry after a timeout. Falls back to the old ack endpoint only if no token
+  /// was ever obtained (push disabled, or Firebase absent), where the backend
+  /// keeps its estimated muster instead.
   @override
   Future<void> ackSafe() async {
     final id = _active.id;
     if (id.isEmpty) return;
     try {
-      await _api.ackIncident(id);
+      final token = _token;
+      if (token != null) {
+        await _api.checkout(id, token);
+      } else {
+        await _api.ackIncident(id);
+      }
     } catch (e) {
       debugPrint('[ApiFireRepository] ackSafe failed: $e');
     }
