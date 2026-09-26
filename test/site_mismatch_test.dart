@@ -1,61 +1,28 @@
 import 'package:firewatch/app.dart';
-import 'package:firewatch/core/config/app_config.dart';
 import 'package:firewatch/core/router/app_router.dart';
 import 'package:firewatch/data/mock/fire_repository.dart';
 import 'package:firewatch/data/mock/mock_data.dart';
 import 'package:firewatch/data/models/models.dart';
-import 'package:firewatch/shared/floor_plan/floor_plan_data.dart';
+import 'package:firewatch/shared/floor_plan/floor_plan_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'helpers/test_surface.dart';
-import 'package:firewatch/shared/floor_plan/floor_plan_view.dart';
 
-/// The phone's own escape-route layout switch.
+/// A route generated for a building this app does not draw.
 ///
-/// It is deliberately independent of the dashboard's detection setting: neither
-/// reads the other. What this file pins is that independence, and the one case
-/// it creates — a route generated for a building the phone is not showing.
+/// The app draws one facility, the trial house. The backend can be pointed at
+/// another site without the app knowing, and a polyline only means anything in
+/// the coordinate space it was computed in. So a route whose site key is not
+/// ours is REFUSED, with a line on screen saying why. A correct path through the
+/// wrong walls looks exactly as authoritative as a right one, which makes
+/// drawing it the worse failure.
+///
+/// There used to be a switch on the dashboard that chose between two layouts,
+/// and this file used to pin that the switch and the backend were free to
+/// disagree. The second layout is gone -- no trial could run in it -- but the
+/// disagreement it created can still arrive from the backend, so the refusal
+/// stays and so does its test.
 void main() {
-  setUp(() => SharedPreferences.setMockInitialValues({}));
-
-  group('the setting', () {
-    test('defaults to industrial', () {
-      expect(FloorPlan.bySiteKey(AppConfig.exitLayout).siteKey, isNotEmpty);
-      expect(AppConfig.exitLayout, anyOf('industrial', 'home'));
-    });
-
-    test('switching picks the other plan', () async {
-      await AppConfig.setExitLayout('home');
-      expect(AppConfig.exitLayout, 'home');
-      expect(FloorPlan.bySiteKey(AppConfig.exitLayout), FloorPlan.home);
-
-      await AppConfig.setExitLayout('industrial');
-      expect(FloorPlan.bySiteKey(AppConfig.exitLayout), FloorPlan.industrial);
-    });
-
-    test('an unknown value falls back rather than throwing', () async {
-      await AppConfig.setExitLayout('nonsense');
-      expect(AppConfig.exitLayout, 'home');
-    });
-
-    test('it survives a restart', () async {
-      await AppConfig.setExitLayout('home');
-      SharedPreferences.setMockInitialValues({'exit_layout': 'home'});
-      await AppConfig.load();
-      expect(AppConfig.exitLayout, 'home');
-    });
-
-    test('it is the phone\'s own setting, not the backend\'s', () async {
-      // The repository reports both. They are read from different places and
-      // must be free to disagree.
-      await AppConfig.setExitLayout('home');
-      final repo = MockFireRepository();
-      expect(repo.exitLayout, 'home');
-      expect(repo.siteKey, 'home');            // the backend handshake default
-    });
-  });
-
   group('a route for a building the phone is not showing', () {
     Incident withRouteFor(String siteKey) {
       final now = DateTime.now();
@@ -118,8 +85,7 @@ void main() {
     }
 
     testWidgets('is refused, and says so', (tester) async {
-      // Phone showing the home plan; route computed for the factory.
-      await AppConfig.setExitLayout('home');
+      // The app draws the house; this route was computed for another building.
       await openIncident(tester, withRouteFor('industrial'));
 
       await scrollTo(tester, find.textContaining('No route shown'));
@@ -129,9 +95,8 @@ void main() {
       expect(find.text('Leave through the east fire exit.'), findsNothing);
     });
 
-    testWidgets('is drawn when the layouts agree', (tester) async {
-      await AppConfig.setExitLayout('industrial');
-      await openIncident(tester, withRouteFor('industrial'));
+    testWidgets('is drawn when the site keys agree', (tester) async {
+      await openIncident(tester, withRouteFor('home'));
 
       await scrollTo(tester, find.text('Leave through the east fire exit.'));
       expect(find.textContaining('No route shown'), findsNothing);
@@ -142,8 +107,7 @@ void main() {
 
     testWidgets('a route with no site key is trusted', (tester) async {
       // Older incidents predate the field; refusing them would lose the route
-      // for every record generated before the setting existed.
-      await AppConfig.setExitLayout('home');
+      // for every record generated before it existed.
       await openIncident(tester, withRouteFor(''));
 
       await scrollTo(tester, find.text('Leave through the east fire exit.'));

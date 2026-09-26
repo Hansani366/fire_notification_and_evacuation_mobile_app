@@ -76,7 +76,7 @@ class ZoneDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                   LocatorCard(
-                    plan: FloorPlan.bySiteKey(repo.exitLayout),
+                    plan: FloorPlan.home,
                     mode: FloorPlanMode.zoneSafe,
                     // Was pinned to the Fabric Store, so every zone's detail
                     // screen highlighted a room the reader was not looking at.

@@ -95,63 +95,54 @@ void main() {
   });
 
   group('FloorPlan', () {
-    test('selects a site, and falls back to the trial one', () {
-      expect(FloorPlan.bySiteKey('home').siteKey, 'home');
-      expect(FloorPlan.bySiteKey('industrial').siteKey, 'industrial');
-      expect(FloorPlan.bySiteKey(null).siteKey, 'home');
-      expect(FloorPlan.bySiteKey('typo').siteKey, 'home');
+    test('the app draws the trial facility and says so', () {
+      // One plan, named. A route generated for any other site is refused rather
+      // than drawn on this one -- see site_mismatch_test.dart.
+      expect(FloorPlan.home.siteKey, 'home');
     });
 
     test('identity is site + revision, not sixty Rects', () {
-      expect(FloorPlan.industrial, equals(FloorPlan.industrial));
-      expect(FloorPlan.industrial, isNot(equals(FloorPlan.home)));
+      // shouldRepaint runs every frame, so equality must not walk the geometry.
+      expect(FloorPlan.home, equals(FloorPlan.home));
+      expect(FloorPlan.home.hashCode,
+          Object.hash(FloorPlan.home.siteKey, FloorPlan.home.revision));
     });
 
-    test('every room with a zoneId names a real zone in that site', () {
+    test('every room with a zoneId names a real zone', () {
       // The plan ids and the zone ids drifted apart once already (`cutting` vs
       // `cutting-floor`), and it went unnoticed because nothing joined them.
       // focusRoomId joins them now.
-      const industrialZones = {
-        'fabric-store', 'cutting-floor', 'dyeing', 'sewing-a',
-        'warehouse', 'boiler', 'finishing',
-      };
-      for (final r in FloorPlan.industrial.rooms) {
-        if (r.zoneId != null) expect(industrialZones, contains(r.zoneId), reason: r.id);
+      final zoneIds = MockData.zones(DateTime.now()).map((z) => z.id).toSet();
+      for (final r in FloorPlan.home.rooms) {
+        if (r.zoneId != null) expect(zoneIds, contains(r.zoneId), reason: r.id);
       }
     });
 
-    test('every mock zone has a room on that site\'s plan', () {
+    test('every mock zone has a room on the plan', () {
       // The other direction of the join above, and the one that was missing.
-      // MockData described the industrial zones while the phone defaulted to
-      // the home plan, so roomForZone returned null for every zone and the plan
-      // quietly drew no room at all. Nothing failed, because nothing asked.
-      final now = DateTime.now();
-      for (final key in ['home', 'industrial']) {
-        final plan = FloorPlan.bySiteKey(key);
-        for (final z in MockData.zones(now, siteKey: key)) {
-          expect(plan.roomForZone(z.id), isNotNull,
-              reason: '$key: no room draws zone ${z.id}');
-        }
+      // MockData once described the industrial zones while the phone defaulted
+      // to the home plan, so roomForZone returned null for every zone and the
+      // plan quietly drew no room at all. Nothing failed, because nothing asked.
+      for (final z in MockData.zones(DateTime.now())) {
+        expect(FloorPlan.home.roomForZone(z.id), isNotNull,
+            reason: 'no room draws zone ${z.id}');
       }
     });
 
-    test('exit ids are unique within a site', () {
-      for (final plan in [FloorPlan.industrial, FloorPlan.home]) {
-        final ids = plan.exits.map((e) => e.id).toList();
-        expect(ids.toSet().length, ids.length, reason: plan.siteKey);
-      }
+    test('exit ids are unique', () {
+      final ids = FloorPlan.home.exits.map((e) => e.id).toList();
+      expect(ids.toSet().length, ids.length);
     });
 
     test('every drawn element sits inside the design space', () {
-      for (final plan in [FloorPlan.industrial, FloorPlan.home]) {
-        final bounds = Offset.zero & plan.designSize;
-        for (final r in plan.rooms) {
-          expect(bounds.contains(r.rect.topLeft), isTrue, reason: '${plan.siteKey}/${r.id}');
-          expect(bounds.contains(r.rect.bottomRight), isTrue, reason: '${plan.siteKey}/${r.id}');
-        }
-        for (final e in plan.exits) {
-          expect(bounds.contains(e.bar.center), isTrue, reason: '${plan.siteKey}/${e.id}');
-        }
+      const plan = FloorPlan.home;
+      final bounds = Offset.zero & plan.designSize;
+      for (final r in plan.rooms) {
+        expect(bounds.contains(r.rect.topLeft), isTrue, reason: r.id);
+        expect(bounds.contains(r.rect.bottomRight), isTrue, reason: r.id);
+      }
+      for (final e in plan.exits) {
+        expect(bounds.contains(e.bar.center), isTrue, reason: e.id);
       }
     });
   });
@@ -170,7 +161,7 @@ void main() {
       return jsonDecode(f.readAsStringSync()) as Map<String, dynamic>;
     }
 
-    for (final entry in {'industrial': FloorPlan.industrial, 'home': FloorPlan.home}.entries) {
+    for (final entry in {'home': FloorPlan.home}.entries) {
       test('${entry.key}: exit ids and coordinate space match', () {
         final site = load(entry.key);
         if (site == null) {

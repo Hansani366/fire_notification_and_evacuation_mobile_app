@@ -7,33 +7,23 @@ import '../models/models.dart';
 /// answers. They must match the site files, or the dashboard shows rooms that
 /// the building does not have.
 ///
-/// Both facilities are held, because the app can draw either one. `home` is the
-/// default on the phone and in `alert-service`, so it is what the dashboard
-/// paints while the first fetch is in flight. Pass `siteKey: 'industrial'` for
-/// the demonstration hall, transcribed from `App_design_v5.html`
-/// (Meridian Garments).
+/// Only the trial facility is held. The app used to carry a second, industrial
+/// layout with a switch to choose between them, which no trial could use: the
+/// premises were never accessible, so nothing could be measured there. `home` is
+/// the default in `alert-service` too, so this is what the dashboard paints
+/// while the first fetch is in flight.
 ///
 /// Zones and the active incident depend on "now" so their relative timestamps
 /// read naturally; history is static.
 class MockData {
   MockData._();
 
-  /// The default facility's display name. See [siteNameFor] for the other one.
+  /// The facility's display name.
   static const siteName = 'Home';
-  static const industrialSiteName = 'Industrial Unit';
 
-  static String siteNameFor(String siteKey) =>
-      siteKey == 'industrial' ? industrialSiteName : siteName;
-
-  /// Zones of the given facility, all clear (resting "All clear" state).
-  ///
-  /// Defaults to `home`, so a phone with no backend shows the trial facility
-  /// rather than a factory it is not standing in.
-  static List<Zone> zones(DateTime now, {String siteKey = 'home'}) =>
-      siteKey == 'industrial' ? industrialZones(now) : homeZones(now);
-
-  /// The 8 rooms of the trial house, mirroring `sites/home.json`.
-  static List<Zone> homeZones(DateTime now) => [
+  /// The 8 rooms of the trial house, all clear (the resting "All clear" state),
+  /// mirroring `sites/home.json`.
+  static List<Zone> zones(DateTime now) => [
         Zone(
           id: 'kitchen',
           name: 'Kitchen',
@@ -105,73 +95,6 @@ class MockData {
           status: ZoneStatus.clear,
           lastScanAt: now.subtract(const Duration(seconds: 6)),
           glyph: ZoneGlyph.bedroom,
-        ),
-      ];
-
-  /// The 7 zones of the demonstration hall, mirroring `sites/industrial.json`.
-  static List<Zone> industrialZones(DateTime now) => [
-        Zone(
-          id: 'fabric-store',
-          name: 'Fabric Store',
-          floor: 'Main floor',
-          detectorId: 'Detector 01',
-          status: ZoneStatus.clear,
-          lastScanAt: now.subtract(const Duration(seconds: 2)),
-          glyph: ZoneGlyph.fabricRoll,
-        ),
-        Zone(
-          id: 'cutting-floor',
-          name: 'Cutting Floor',
-          floor: 'Main floor',
-          detectorId: 'Detector 02',
-          status: ZoneStatus.clear,
-          lastScanAt: now.subtract(const Duration(seconds: 3)),
-          glyph: ZoneGlyph.scissors,
-        ),
-        Zone(
-          id: 'dyeing',
-          name: 'Dyeing Section',
-          floor: 'Main floor',
-          detectorId: 'Detector 03',
-          status: ZoneStatus.clear,
-          lastScanAt: now.subtract(const Duration(seconds: 4)),
-          glyph: ZoneGlyph.dyeing,
-        ),
-        Zone(
-          id: 'sewing-a',
-          name: 'Sewing Line A',
-          floor: 'Main floor',
-          detectorId: 'Detector 04',
-          status: ZoneStatus.clear,
-          lastScanAt: now.subtract(const Duration(seconds: 4)),
-          glyph: ZoneGlyph.iron,
-        ),
-        Zone(
-          id: 'warehouse',
-          name: 'Warehouse',
-          floor: 'Main floor',
-          detectorId: 'Detector 05',
-          status: ZoneStatus.clear,
-          lastScanAt: now.subtract(const Duration(seconds: 5)),
-          glyph: ZoneGlyph.warehouse,
-        ),
-        Zone(
-          id: 'boiler',
-          name: 'Boiler Room',
-          floor: 'Main floor',
-          detectorId: 'Detector 06',
-          status: ZoneStatus.clear,
-          lastScanAt: now.subtract(const Duration(seconds: 5)),
-          glyph: ZoneGlyph.boiler,
-        ),
-        Zone(
-          id: 'finishing',
-          name: 'Finishing',
-          floor: 'Main floor',
-          detectorId: 'Detector 07',
-          status: ZoneStatus.clear,
-          lastScanAt: now.subtract(const Duration(seconds: 6)),
-          glyph: ZoneGlyph.finishing,
         ),
       ];
 

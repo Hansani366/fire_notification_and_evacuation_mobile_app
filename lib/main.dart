@@ -5,16 +5,12 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
 import 'app.dart';
-import 'core/config/app_config.dart';
 import 'core/notifications/notification_service.dart';
 import 'core/router/app_router.dart';
 import 'data/api/api_fire_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Resolve the backend base URL (compile-time default + any saved override).
-  await AppConfig.load();
 
   final repository = ApiFireRepository();
   final router = buildRouter();

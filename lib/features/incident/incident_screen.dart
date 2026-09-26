@@ -72,15 +72,15 @@ class _IncidentScreenState extends State<IncidentScreen> {
     final isFire = incident.severity == IncidentSeverity.fire;
     final occupants = incident.occupancy.current;
 
-    // The layout is this phone's own setting; the route was generated against
-    // whatever building the backend is configured for. Usually the same, but
-    // they are set independently and can disagree.
+    // The app draws one building; the route was generated against whatever
+    // building the backend is configured for. Usually the same one, but the
+    // backend can be pointed at another site without the app knowing.
     //
     // A polyline only means anything in the coordinate space it was computed in,
     // so when they disagree the route is NOT drawn on the other building's plan.
     // A correct path through the wrong walls is worse than no path: it looks
     // exactly as authoritative and leads somewhere that does not exist.
-    final plan = FloorPlan.bySiteKey(RepositoryScope.of(context).exitLayout);
+    const plan = FloorPlan.home;
     final route = incident.route;
     final layoutMatches = route == null || route.siteKey.isEmpty ||
         route.siteKey == plan.siteKey;
