@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:firewatch/data/models/models.dart';
 import 'package:firewatch/shared/floor_plan/floor_plan_data.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:firewatch/data/mock/mock_data.dart';
 
 /// The route layer, and the contract it shares with the backend site files.
 void main() {
@@ -116,6 +117,21 @@ void main() {
       };
       for (final r in FloorPlan.industrial.rooms) {
         if (r.zoneId != null) expect(industrialZones, contains(r.zoneId), reason: r.id);
+      }
+    });
+
+    test('every mock zone has a room on that site\'s plan', () {
+      // The other direction of the join above, and the one that was missing.
+      // MockData described the industrial zones while the phone defaulted to
+      // the home plan, so roomForZone returned null for every zone and the plan
+      // quietly drew no room at all. Nothing failed, because nothing asked.
+      final now = DateTime.now();
+      for (final key in ['home', 'industrial']) {
+        final plan = FloorPlan.bySiteKey(key);
+        for (final z in MockData.zones(now, siteKey: key)) {
+          expect(plan.roomForZone(z.id), isNotNull,
+              reason: '$key: no room draws zone ${z.id}');
+        }
       }
     });
 

@@ -4,6 +4,7 @@ import 'package:firewatch/data/mock/fire_repository.dart';
 import 'package:firewatch/data/mock/mock_data.dart';
 import 'package:firewatch/data/models/models.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'helpers/test_surface.dart';
 
 /// Check-out, head-count and the incident record.
 ///
@@ -136,6 +137,7 @@ void main() {
           const FakeAccessibilityFeatures(disableAnimations: true);
       addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
       final router = buildRouter();
+      useTallSurface(tester);
       await tester.pumpWidget(FireWatchApp(
         repository: MockFireRepository(incident: incident, live: true),
         router: router,

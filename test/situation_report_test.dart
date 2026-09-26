@@ -3,8 +3,8 @@ import 'package:firewatch/core/router/app_router.dart';
 import 'package:firewatch/data/mock/fire_repository.dart';
 import 'package:firewatch/data/mock/mock_data.dart';
 import 'package:firewatch/data/models/models.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'helpers/test_surface.dart';
 
 /// The situation report (RO3.1) as the phone renders it.
 ///
@@ -51,17 +51,8 @@ Incident _incidentWith(SituationReport r) {
 }
 
 Future<void> _openIncident(WidgetTester tester, Incident incident) async {
-  tester.platformDispatcher.accessibilityFeaturesTestValue =
-      const FakeAccessibilityFeatures(disableAnimations: true);
-  addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
-  // A tall surface so the whole incident screen is laid out at once. The screen
-  // is a ListView, which builds lazily, so on the default 800x600 test surface
-  // the report card sits below the fold and is never built — the finders would
-  // then fail for a reason that has nothing to do with the report.
-  tester.view.physicalSize = const Size(1080, 3000);
-  tester.view.devicePixelRatio = 1.0;
-  addTearDown(tester.view.resetPhysicalSize);
-  addTearDown(tester.view.resetDevicePixelRatio);
+  disableAnimations(tester);
+  useTallSurface(tester);
   final router = buildRouter();
   await tester.pumpWidget(FireWatchApp(
     repository: MockFireRepository(incident: incident, live: true),

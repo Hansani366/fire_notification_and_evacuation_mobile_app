@@ -8,6 +8,8 @@ import 'package:firewatch/shared/floor_plan/floor_plan_data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'helpers/test_surface.dart';
+import 'package:firewatch/shared/floor_plan/floor_plan_view.dart';
 
 /// The phone's own escape-route layout switch.
 ///
@@ -103,6 +105,7 @@ void main() {
       tester.platformDispatcher.accessibilityFeaturesTestValue =
           const FakeAccessibilityFeatures(disableAnimations: true);
       addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+      useTallSurface(tester);
       final router = buildRouter();
       await tester.pumpWidget(FireWatchApp(
         repository: MockFireRepository(incident: incident, live: true),
@@ -133,6 +136,8 @@ void main() {
       await scrollTo(tester, find.text('Leave through the east fire exit.'));
       expect(find.textContaining('No route shown'), findsNothing);
       expect(find.text('Leave through the east fire exit.'), findsOneWidget);
+      // The plan itself must be on screen, not just the instruction under it.
+      expect(find.byType(FloorPlanView), findsOneWidget);
     });
 
     testWidgets('a route with no site key is trusted', (tester) async {

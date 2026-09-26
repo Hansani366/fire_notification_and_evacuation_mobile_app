@@ -5,6 +5,7 @@ import 'package:firewatch/data/mock/mock_data.dart';
 import 'package:firewatch/data/models/models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'helpers/test_surface.dart';
 
 /// Regressions for the four-state model. Each of these was a real, shipped
 /// behaviour that told the person holding the phone something untrue.
@@ -48,6 +49,7 @@ Future<void> _pumpApp(WidgetTester tester, MockFireRepository repo) async {
   tester.platformDispatcher.accessibilityFeaturesTestValue =
       const FakeAccessibilityFeatures(disableAnimations: true);
   addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+  useTallSurface(tester);
   await tester.pumpWidget(_app(repo));
   await tester.pumpAndSettle();
 }
