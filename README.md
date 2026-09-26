@@ -123,8 +123,11 @@ address of the machine running the backend:
 ```bash
 # macOS or Linux
 flutter run --dart-define=API_BASE_URL=http://$(ipconfig getifaddr en0):8090
+```
 
-# Windows: find the IPv4 address with `ipconfig`, then
+```powershell
+# Windows, PowerShell. Read the IPv4 Address of your Wi-Fi adapter first.
+ipconfig
 flutter run --dart-define=API_BASE_URL=http://192.168.1.42:8090
 ```
 
@@ -161,12 +164,27 @@ logs the notifications it would have sent.
 **Testing it without a fire.** With the backend running:
 
 ```bash
+# macOS or Linux
 curl -X POST localhost:8090/api/test-alert -d '{}'                              # a fire
 curl -X POST localhost:8090/api/test-alert -H 'content-type: application/json' \
      -d '{"severity":"warning"}'                                                # a quiet gas warning
 curl -X POST localhost:8090/api/test-alert -H 'content-type: application/json' \
      -d '{"severity":"gas_danger"}'                                             # a gas alarm
 ```
+
+```powershell
+# Windows, PowerShell
+$u = "http://localhost:8090/api/test-alert"
+Invoke-RestMethod -Method Post -Uri $u                                    # a fire
+Invoke-RestMethod -Method Post -Uri $u -ContentType application/json `
+  -Body '{"severity":"warning"}'                                          # a quiet gas warning
+Invoke-RestMethod -Method Post -Uri $u -ContentType application/json `
+  -Body '{"severity":"gas_danger"}'                                       # a gas alarm
+```
+
+`Invoke-RestMethod` is used instead of `curl.exe` because PowerShell removes the
+quotation marks inside a JSON string before `curl.exe` receives it, which makes the
+request fail.
 
 **Checks:**
 
