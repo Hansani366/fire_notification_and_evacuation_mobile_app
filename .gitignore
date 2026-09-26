@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firebase config: holds the project's Android API key, so it stays local.
+# Fetch it from the Firebase console, or with:
+#   gcloud/firebase → android/app/google-services.json
+/android/app/google-services.json
