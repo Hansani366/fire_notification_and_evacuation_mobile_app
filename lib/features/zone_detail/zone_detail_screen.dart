@@ -75,20 +75,24 @@ class ZoneDetailScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  LocatorCard(
-                    plan: FloorPlan.forSiteKey(repo.siteKey) ?? FloorPlan.home,
-                    mode: FloorPlanMode.zoneSafe,
-                    // Was pinned to the Fabric Store, so every zone's detail
-                    // screen highlighted a room the reader was not looking at.
-                    focusRoomId: zoneId,
-                    header: 'This zone · ${zone.floor}',
-                    legend: const [
-                      LegendItem(AppColors.safe, 'This zone · safe'),
-                      LegendItem(AppColors.safe, 'Fire exit'),
-                      LegendItem(AppColors.planDoor, 'Door'),
-                      LegendItem(AppColors.planWalkway, 'Walkway'),
-                    ],
-                  ),
+                  // Drawn only when this build has the backend's site. Falling back
+                  // to the home plan would highlight nothing (roomForZone finds no
+                  // room) on a building the reader may not even be in.
+                  if (FloorPlan.forSiteKey(repo.siteKey) case final plan?)
+                    LocatorCard(
+                      plan: plan,
+                      mode: FloorPlanMode.zoneSafe,
+                      // Was pinned to the Fabric Store, so every zone's detail
+                      // screen highlighted a room the reader was not looking at.
+                      focusRoomId: zoneId,
+                      header: 'This zone · ${zone.floor}',
+                      legend: const [
+                        LegendItem(AppColors.safe, 'This zone · safe'),
+                        LegendItem(AppColors.safe, 'Fire exit'),
+                        LegendItem(AppColors.planDoor, 'Door'),
+                        LegendItem(AppColors.planWalkway, 'Walkway'),
+                      ],
+                    ),
                   const SizedBox(height: 8),
                 ],
               ),

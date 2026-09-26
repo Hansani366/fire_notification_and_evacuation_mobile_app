@@ -69,14 +69,16 @@ void main() {
       );
     }
 
-    Future<void> openIncident(WidgetTester tester, Incident incident) async {
+    Future<void> openIncident(WidgetTester tester, Incident incident,
+        {String backendSite = 'home'}) async {
       tester.platformDispatcher.accessibilityFeaturesTestValue =
           const FakeAccessibilityFeatures(disableAnimations: true);
       addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
       useTallSurface(tester);
       final router = buildRouter();
       await tester.pumpWidget(FireWatchApp(
-        repository: MockFireRepository(incident: incident, live: true),
+        repository: MockFireRepository(
+            incident: incident, live: true, siteKey: backendSite),
         router: router,
       ));
       await tester.pumpAndSettle();
@@ -91,18 +93,20 @@ void main() {
       // been given artwork for is the case that must refuse.
       await openIncident(tester, withRouteFor('warehouse-b'));
 
-      await scrollTo(tester, find.textContaining('No route shown'));
-      expect(find.textContaining('No route shown'), findsOneWidget);
+      await scrollTo(tester, find.textContaining('No route or floor plan'));
+      expect(find.textContaining('No route or floor plan'), findsOneWidget);
       // A correct path through the wrong walls looks exactly as authoritative
       // as a right one, so the instruction must not appear either.
       expect(find.text('Leave through the east fire exit.'), findsNothing);
+      // And no plan at all: a drawing of one building stands for every other.
+      expect(find.byType(FloorPlanView), findsNothing);
     });
 
     testWidgets('the trial facility is drawn', (tester) async {
       await openIncident(tester, withRouteFor('home'));
 
       await scrollTo(tester, find.text('Leave through the east fire exit.'));
-      expect(find.textContaining('No route shown'), findsNothing);
+      expect(find.textContaining('No route or floor plan'), findsNothing);
       expect(find.text('Leave through the east fire exit.'), findsOneWidget);
       // The plan itself must be on screen, not just the instruction under it.
       expect(find.byType(FloorPlanView), findsOneWidget);
@@ -117,19 +121,36 @@ void main() {
       await openIncident(tester, withRouteFor('industrial'));
 
       await scrollTo(tester, find.text('Leave through the east fire exit.'));
-      expect(find.textContaining('No route shown'), findsNothing);
+      expect(find.textContaining('No route or floor plan'), findsNothing);
       expect(find.text('Leave through the east fire exit.'), findsOneWidget);
       expect(find.byType(FloorPlanView), findsOneWidget);
     });
 
-    testWidgets('a route with no site key is trusted', (tester) async {
+    testWidgets('a route with no site key uses the backend\'s site',
+        (tester) async {
       // Older incidents predate the field; refusing them would lose the route
-      // for every record generated before it existed.
-      await openIncident(tester, withRouteFor(''));
+      // for every record generated before it existed. The backend that served
+      // them says which building they belong to.
+      await openIncident(tester, withRouteFor(''), backendSite: 'industrial');
 
       await scrollTo(tester, find.text('Leave through the east fire exit.'));
-      expect(find.textContaining('No route shown'), findsNothing);
+      expect(find.textContaining('No route or floor plan'), findsNothing);
       expect(find.text('Leave through the east fire exit.'), findsOneWidget);
+      expect(find.byType(FloorPlanView), findsOneWidget);
+    });
+
+    testWidgets('no site key and a backend site with no plan is refused',
+        (tester) async {
+      // THE CASE THIS FILE EXISTS FOR. An empty route site key used to be
+      // trusted against a hard-coded home plan, so a route from a building this
+      // build has never drawn was laid over the trial house -- silently, with
+      // the instruction underneath it. Neither is shown now.
+      await openIncident(tester, withRouteFor(''), backendSite: 'warehouse-b');
+
+      await scrollTo(tester, find.textContaining('No route or floor plan'));
+      expect(find.textContaining('No route or floor plan'), findsOneWidget);
+      expect(find.text('Leave through the east fire exit.'), findsNothing);
+      expect(find.byType(FloorPlanView), findsNothing);
     });
   });
 }

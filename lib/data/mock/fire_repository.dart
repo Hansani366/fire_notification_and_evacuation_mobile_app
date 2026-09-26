@@ -71,15 +71,24 @@ class MockFireRepository extends FireRepository {
   /// an open gas warning, a carbon-monoxide alarm, a fire confirmed while the
   /// scene model was unreachable — without a backend. Left alone, this is the
   /// resting all-clear state with a fire fixture behind the takeover screens.
+  /// [siteKey] is the site the *backend* declares, which is what the incident
+  /// screen falls back to when a route does not name one. A test passes a site
+  /// this build has no drawing for to exercise that refusal; it does not change
+  /// which zones the mock describes.
   MockFireRepository({
     Incident? incident,
     this.live = false,
+    this.siteKey = 'home',
   }) : _now = DateTime.now() {
     _zones = MockData.zones(_now);
     _incident = incident ?? MockData.incident(_now);
   }
 
   final DateTime _now;
+
+  /// The site the backend declares. Overrides the base getter as a field.
+  @override
+  final String siteKey;
 
   /// Whether [activeIncident] represents something happening right now.
   final bool live;

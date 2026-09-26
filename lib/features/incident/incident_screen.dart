@@ -87,12 +87,16 @@ class _IncidentScreenState extends State<IncidentScreen> {
     // authoritative and leads somewhere that does not exist.
     final route = incident.route;
     final routeSite = route?.siteKey ?? '';
-    final plan = FloorPlan.forSiteKey(
-            routeSite.isNotEmpty ? routeSite : repo.siteKey) ??
-        FloorPlan.home;
-    final layoutMatches = route == null || routeSite.isEmpty ||
-        routeSite == plan.siteKey;
-    final drawableRoute = layoutMatches ? route : null;
+    // Which building this belongs to: the route says so itself, and when it does
+    // not -- records that predate the field -- the backend that generated it
+    // says so instead. Never the phone.
+    final claimedSite = routeSite.isNotEmpty ? routeSite : repo.siteKey;
+    // NO DEFAULT PLAN. A null answer means this build has no drawing for that
+    // site, and the honest response is to show neither a route nor a plan. It
+    // used to fall back to the home drawing, which turned "we do not know which
+    // building this is" into a picture of a specific house with YOU marked in it.
+    final plan = FloorPlan.forSiteKey(claimedSite);
+    final drawableRoute = plan == null ? null : route;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark,
@@ -168,34 +172,33 @@ class _IncidentScreenState extends State<IncidentScreen> {
                       GuidanceCard(classification: c),
                     ],
                     const SizedBox(height: 14),
-                    if (!layoutMatches) ...[
-                      _LayoutMismatch(routeSite: route.siteKey),
-                      const SizedBox(height: 10),
-                    ],
-                    LocatorCard(
-                      plan: plan,
-                      // Without a usable route there is nothing to march along,
-                      // so the plan is drawn plainly rather than with a stale
-                      // demonstration path over it.
-                      mode: drawableRoute == null && !layoutMatches
-                          ? FloorPlanMode.zoneSafe
-                          : FloorPlanMode.incidentRoute,
-                      route: drawableRoute,
-                      focusRoomId: drawableRoute?.fireZoneId ?? zone.id,
-                      legend: const [
-                        LegendItem(AppColors.you, 'You'),
-                        LegendItem(AppColors.danger, 'Fire — avoid'),
-                        LegendItem(AppColors.safe, 'Fire exit'),
-                        LegendItem(AppColors.planBlocked, 'Blocked exit'),
-                        LegendItem(AppColors.planDoor, 'Door'),
-                        LegendItem(AppColors.planWalkway, 'Walkway'),
-                        LegendItem(AppColors.safe, 'Safe route'),
+                    if (plan == null)
+                      _NoPlanForSite(site: claimedSite)
+                    else ...[
+                      LocatorCard(
+                        plan: plan,
+                        mode: FloorPlanMode.incidentRoute,
+                        // Null here is an incident with no route at all — a
+                        // routing failure or an old record — and the plan then
+                        // draws the frame this app shipped with, so degrading
+                        // looks deliberate rather than broken.
+                        route: drawableRoute,
+                        focusRoomId: drawableRoute?.fireZoneId ?? zone.id,
+                        legend: const [
+                          LegendItem(AppColors.you, 'You'),
+                          LegendItem(AppColors.danger, 'Fire — avoid'),
+                          LegendItem(AppColors.safe, 'Fire exit'),
+                          LegendItem(AppColors.planBlocked, 'Blocked exit'),
+                          LegendItem(AppColors.planDoor, 'Door'),
+                          LegendItem(AppColors.planWalkway, 'Walkway'),
+                          LegendItem(AppColors.safe, 'Safe route'),
+                        ],
+                      ),
+                      if (drawableRoute case final r?
+                          when r.instruction.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _RouteInstruction(route: r),
                       ],
-                    ),
-                    if (drawableRoute case final r?
-                        when r.instruction.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      _RouteInstruction(route: r),
                     ],
                     const SizedBox(height: 16),
                     MetaLine(
@@ -417,19 +420,27 @@ class _BadgeShell extends StatelessWidget {
 ///
 /// The alternative — quietly falling back to the plan's stock route — would put
 /// a confident-looking path on screen that nobody generated for this fire.
-class _LayoutMismatch extends StatelessWidget {
-  const _LayoutMismatch({required this.routeSite});
+/// Shown instead of the plan when this build has no drawing for the site the
+/// alert belongs to.
+///
+/// Both things are withheld together on purpose. Withholding only the route and
+/// still drawing a plan would put a specific building on screen, with a room
+/// highlighted and YOU marked in it, for a site we have just admitted we cannot
+/// identify.
+class _NoPlanForSite extends StatelessWidget {
+  const _NoPlanForSite({required this.site});
 
-  final String routeSite;
+  final String site;
 
   @override
   Widget build(BuildContext context) {
-    // Name the site the route claims, whatever it is. Mapping every unknown key
-    // to "Industrial" was safe only while there were exactly two layouts.
-    final name = switch (routeSite) {
+    // Name the site as it arrived, whatever it is. Mapping every unknown key to
+    // "Industrial" was safe only while there were exactly two layouts.
+    final name = switch (site) {
       'home' => 'Home demo',
       'industrial' => 'Industrial',
-      _ => routeSite,
+      '' => 'unnamed',
+      _ => site,
     };
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -445,9 +456,9 @@ class _LayoutMismatch extends StatelessWidget {
           const SizedBox(width: 9),
           Expanded(
             child: Text(
-              'No route shown. This alert was generated for the "$name" layout, '
-              'and this app has no floor plan for it, so the route cannot be '
-              'drawn. Leave by the escape signs in the building.',
+              'No route or floor plan shown. This alert belongs to the "$name" '
+              'site, and this app has no plan for it, so a route cannot be '
+              'placed on one. Leave by the escape signs in the building.',
               style: AppText.inter(13, 500, color: AppColors.warnInk, height: 1.4),
             ),
           ),
