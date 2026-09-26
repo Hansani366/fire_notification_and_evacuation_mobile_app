@@ -63,8 +63,9 @@ replace statutory signage or the instructions of a trained fire warden.
   count is kept separate from the camera head count and both are shown together.
 - **An incident record.** The history screen opens a full record: the timeline,
   how much warning the sensors gave, the route taken, and both occupancy counts.
-- **A layout switch.** The app can draw either the industrial plan or the home
-  plan used in the trials. This setting belongs to the phone.
+- **An alert that presents itself.** A confirmed fire is a full-screen Android
+  notification on the fire channel, so a locked phone shows the alarm and the
+  route can be read without unlocking. A gas warning never does this.
 - **It works when things go wrong.** The app runs with no backend and no Firebase
   configuration, and a push carries enough data to draw the full route offline.
 
@@ -133,10 +134,10 @@ flutter run --dart-define=API_BASE_URL=http://192.168.1.42:8090
 
 - With no address, the app uses `http://10.0.2.2:8090`, which is how an Android
   emulator reaches the host machine.
-- You can also change the address inside the app by long pressing the dashboard
-  title, which helps on a new network.
+- The build is the only place the address comes from. There is no setting inside
+  the app, so an installed build always talks to the server it was built for.
 
-**Permissions.** The application declares only the two permissions in Table 3.
+**Permissions.** The application declares only the three permissions in Table 3.
 
 **Table 3.** Android permissions requested by the application.
 
@@ -144,9 +145,12 @@ flutter run --dart-define=API_BASE_URL=http://192.168.1.42:8090
 |---|---|
 | `INTERNET` | To reach the alert service and Firebase. |
 | `POST_NOTIFICATIONS` | Required on Android 13 and later. It is requested at startup. |
+| `USE_FULL_SCREEN_INTENT` | Lets a confirmed fire take over a locked screen instead of waiting to be noticed. |
 
 Accept the notification prompt when it appears, because it is what allows
-Android to display alerts.
+Android to display alerts. On Android 14 and later, also turn on **Full screen
+notifications** under Settings > Apps > FireWatch on any handset used for a
+trial. Without it the fire alert still arrives, as an ordinary heads-up.
 
 **Push notifications.** These need the two files in Table 4, which are not
 included in this repository.
@@ -201,13 +205,15 @@ Each point is a decision taken for a stated reason.
 - **Android is the target platform.** The trials need one platform that receives
   push notifications reliably. The code is Flutter, so iOS remains a supported
   path.
-- **The floor plans are drawn in the app on purpose.** The backend owns the
-  graph and the route; the app owns the artwork, which keeps the plan readable
-  under pressure. Two plans are included: the industrial site and the home used
-  in the trials.
-- **The layout setting belongs to the phone.** If it does not match the building
-  a route was generated for, the app refuses to draw the route and says why. A
-  correct path over the wrong plan would look just as convincing as a right one.
+- **The floor plan is drawn in the app on purpose.** The backend owns the graph
+  and the route; the app owns the artwork, which keeps the plan readable under
+  pressure. One plan is included, the home used in the trials. An industrial plan
+  and a switch between the two were removed, because those premises were never
+  accessible and no trial could run there.
+- **A route for another building is refused.** The backend can be pointed at a
+  different site, so if a route does not name the building the app draws, the app
+  says why instead of drawing it. A correct path over the wrong plan would look
+  just as convincing as a right one.
 - **A check-out identifies a device, not a person.** This is what makes the count
   reliable, because a double tap or a retry counts once. It also means two people
   sharing a phone appear as one. No personal data is stored.
@@ -219,7 +225,8 @@ Each point is a decision taken for a stated reason.
   make a responder use the wrong agent.
 - **Plain HTTP is used on the local network.** This avoids the self-signed
   certificate during trials. A real deployment would need HTTPS.
-- **One light theme, by choice.** The alarm screens then look the same on every
-  device during the trials and the expert evaluation.
+- **One light theme, by choice, including the splash screen.** The alarm screens
+  then look the same on every device during the trials and the expert evaluation,
+  whatever each handset's dark-mode setting says.
 - **Scope of the safety claim.** This is a research prototype. Its guidance is
   advisory and does not override statutory signage or a trained fire warden.
