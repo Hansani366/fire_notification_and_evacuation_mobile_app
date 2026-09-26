@@ -48,3 +48,8 @@ app.*.map.json
 # Fetch it from the Firebase console, or with:
 #   gcloud/firebase → android/app/google-services.json
 /android/app/google-services.json
+
+# Local helper that hardcodes the public ngrok URL. Stays off GitHub, because
+# the backend API behind that URL has no authentication.
+/run-remote.sh
+/run-remote.ps1
