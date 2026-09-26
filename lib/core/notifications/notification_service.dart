@@ -14,9 +14,9 @@ import '../config/app_config.dart';
 /// function. Our messages carry a `notification` block, so Android draws the
 /// tray/heads-up itself — the only work here is closing the delivery round trip.
 ///
-/// This runs in a SEPARATE ISOLATE with none of `main()`'s state: no repository,
-/// no router, no loaded config. So it reads the base URL and the device token
-/// back from shared_preferences and posts directly. It is also the case that
+/// This runs in a SEPARATE ISOLATE with none of `main()`'s state: no repository
+/// and no router. The base URL is compiled in, so it only has to read the device
+/// token back from shared_preferences before posting. It is also the case that
 /// matters most for Table 3.19 — an alert arriving on a phone in somebody's
 /// pocket at night is the delivery the whole measurement is about, and it is the
 /// one a foreground-only acknowledgement would never see.
@@ -28,7 +28,6 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
     final id = (message.data['incidentId'] as String?) ?? '';
     if (id.isEmpty) return;
-    await AppConfig.load();
     final token = await AppConfig.deviceToken();
     if (token == null) return;
     final api = ApiClient();
@@ -43,7 +42,22 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 /// Wires FCM + local notifications into the app: registers the device token,
-/// shows a heads-up on foreground alerts, and deep-links a tap to `/incident`.
+/// builds the alert Android shows, and deep-links a tap to `/incident`.
+///
+/// WHO DRAWS THE NOTIFICATION DEPENDS ON THE APP'S STATE, AND BOTH PATHS ARE
+/// REAL. `alert-service` sends a `notification` block alongside the data, so
+/// when the app is backgrounded or terminated **Android** posts the alert from
+/// that block: it appears on the real lock screen, on the fire channel, at
+/// `Importance.max`. When the app is running, FCM hands the message to
+/// [_onForeground] instead and the alert is built here, where a full-screen
+/// intent can be attached.
+///
+/// The split is deliberate. A notification the system draws cannot be lost by
+/// our isolate failing to start, which for a fire alarm is the failure that
+/// matters most; the price is that the block carries no full-screen intent,
+/// because FCM has no field for one. Moving fire pushes to data-only would buy
+/// the takeover in every state and put the alarm behind our own code running
+/// first — a trade this prototype does not make.
 class NotificationService {
   NotificationService._();
   static final NotificationService instance = NotificationService._();
@@ -183,6 +197,20 @@ class NotificationService {
               : AndroidNotificationCategory.alarm,
           playSound: !warning,
           visibility: NotificationVisibility.public,
+          // A FIRE TAKES OVER A LOCKED SCREEN; A GAS WARNING NEVER DOES.
+          //
+          // With this set, Android presents the alert itself rather than a card
+          // the person has to notice and tap, and `showWhenLocked` on the
+          // activity lets the route be read without unlocking. This replaces a
+          // screen the app used to draw for itself — a fake lock screen with a
+          // fake notification card on it — which was only ever a picture of this
+          // behaviour and would have put a mock-up in front of the RO3.4
+          // participants instead of the notification being evaluated.
+          //
+          // On Android 14+ the permission is special-access, so an ungranted
+          // handset shows an ordinary heads-up instead. That is a quieter alert,
+          // not a lost one, which is the right way for this to fail.
+          fullScreenIntent: !warning,
         ),
       ),
       payload: jsonEncode(msg.data),

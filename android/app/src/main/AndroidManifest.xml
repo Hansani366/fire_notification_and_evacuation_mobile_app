@@ -2,6 +2,12 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Android 13+ runtime notification permission (requested at startup). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- A fire alert presents itself rather than waiting to be noticed. On
+         Android 14+ this is special access: if it is not granted the alert
+         arrives as an ordinary heads-up instead, which is quieter but not lost.
+         Grant it under Settings > Apps > FireWatch > Full screen notifications
+         on any handset used for a trial. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
 
     <application
         android:label="FireWatch"
@@ -13,6 +19,8 @@
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"

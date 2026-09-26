@@ -5,7 +5,6 @@ import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/history/history_screen.dart';
 import '../../features/history_detail/history_detail_screen.dart';
 import '../../features/incident/incident_screen.dart';
-import '../../features/lock/lock_screen.dart';
 import '../../features/report/report_screen.dart';
 import '../../features/warning/warning_screen.dart';
 import '../../features/resolved/resolved_screen.dart';
@@ -15,7 +14,9 @@ import 'home_shell.dart';
 /// App routes for the two flows:
 ///  - Flow B shell (bottom nav): `/dashboard` ⇄ `/history`
 ///  - Pushed details (no nav): `/zone/:id`, `/history-detail/:id`
-///  - Flow A takeovers (slide-up over everything): `/lock`, `/incident`, `/resolved`
+///  - Takeovers (slide-up over everything): `/warning`, `/incident`, `/resolved`.
+///    A fire alert arrives as a real Android notification, so there is no
+///    in-app lock screen: Android's own is the one the phone shows.
 GoRouter buildRouter({GlobalKey<NavigatorState>? navigatorKey}) => GoRouter(
       navigatorKey: navigatorKey,
       initialLocation: '/dashboard',
@@ -57,11 +58,6 @@ GoRouter buildRouter({GlobalKey<NavigatorState>? navigatorKey}) => GoRouter(
           path: '/report/:id',
           builder: (context, state) =>
               ReportScreen(incidentId: state.pathParameters['id']!),
-        ),
-        GoRoute(
-          path: '/lock',
-          pageBuilder: (context, state) =>
-              _takeover(state.pageKey, const LockScreen()),
         ),
         // Tier 1a. A takeover like the others, but the screen behind it is
         // deliberately calm: a gas warning is not an evacuation.

@@ -4,7 +4,7 @@ import '../../core/theme/app_tokens.dart';
 import '../../core/theme/app_typography.dart';
 
 /// In-content app bar (`.appbar`): a big title with a smaller subtitle beneath,
-/// and an optional trailing widget (round action or a chip).
+/// and an optional trailing widget (e.g. a status chip).
 class GreetingAppBar extends StatelessWidget {
   const GreetingAppBar({
     super.key,
@@ -48,38 +48,6 @@ class GreetingAppBar extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-/// The 40×40 circular icon action in the app bar (`.round-btn`).
-class RoundIconButton extends StatelessWidget {
-  const RoundIconButton({
-    super.key,
-    required this.icon,
-    required this.onTap,
-    this.tooltip,
-  });
-
-  final IconData icon;
-  final VoidCallback onTap;
-  final String? tooltip;
-
-  @override
-  Widget build(BuildContext context) {
-    final button = Material(
-      color: AppColors.card,
-      shape: CircleBorder(side: BorderSide(color: AppColors.line)),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: SizedBox(
-          width: 40,
-          height: 40,
-          child: Icon(icon, size: 19, color: AppColors.ink),
-        ),
-      ),
-    );
-    return tooltip == null ? button : Tooltip(message: tooltip!, child: button);
   }
 }
 
