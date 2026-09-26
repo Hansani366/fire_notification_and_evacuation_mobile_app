@@ -7,11 +7,12 @@ import '../models/models.dart';
 /// answers. They must match the site files, or the dashboard shows rooms that
 /// the building does not have.
 ///
-/// Only the trial facility is held. The app used to carry a second, industrial
-/// layout with a switch to choose between them, which no trial could use: the
-/// premises were never accessible, so nothing could be measured there. `home` is
-/// the default in `alert-service` too, so this is what the dashboard paints
-/// while the first fetch is in flight.
+/// Only the trial facility's zones are held, because this is first-paint
+/// content: the real zones arrive from `GET /api/state` a moment later, whichever
+/// site the backend serves. `home` is the default in `alert-service` too, so this
+/// is what the dashboard paints while the first fetch is in flight. The floor
+/// plan is a different matter — `FloorPlan` holds a drawing per site and picks
+/// one from the route, so a backend on another site is drawn correctly.
 ///
 /// Zones and the active incident depend on "now" so their relative timestamps
 /// read naturally; history is static.

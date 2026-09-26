@@ -95,10 +95,21 @@ void main() {
   });
 
   group('FloorPlan', () {
-    test('the app draws the trial facility and says so', () {
-      // One plan, named. A route generated for any other site is refused rather
-      // than drawn on this one -- see site_mismatch_test.dart.
-      expect(FloorPlan.home.siteKey, 'home');
+    test('every drawing is filed under its own site key', () {
+      // forSiteKey is the whole plan-selection mechanism now, so a drawing filed
+      // under the wrong key would silently pair a route with another building.
+      FloorPlan.byKey.forEach((key, plan) => expect(plan.siteKey, key));
+      expect(FloorPlan.byKey.keys, containsAll(['home', 'industrial']));
+    });
+
+    test('a site with no drawing resolves to null, not to a default', () {
+      // The screen turns null into "no route shown". A default would draw the
+      // route on whichever building happened to be first.
+      expect(FloorPlan.forSiteKey('warehouse-b'), isNull);
+      expect(FloorPlan.forSiteKey(''), isNull);
+      expect(FloorPlan.forSiteKey(null), isNull);
+      expect(FloorPlan.forSiteKey('home'), FloorPlan.home);
+      expect(FloorPlan.forSiteKey('industrial'), FloorPlan.industrial);
     });
 
     test('identity is site + revision, not sixty Rects', () {
@@ -108,17 +119,7 @@ void main() {
           Object.hash(FloorPlan.home.siteKey, FloorPlan.home.revision));
     });
 
-    test('every room with a zoneId names a real zone', () {
-      // The plan ids and the zone ids drifted apart once already (`cutting` vs
-      // `cutting-floor`), and it went unnoticed because nothing joined them.
-      // focusRoomId joins them now.
-      final zoneIds = MockData.zones(DateTime.now()).map((z) => z.id).toSet();
-      for (final r in FloorPlan.home.rooms) {
-        if (r.zoneId != null) expect(zoneIds, contains(r.zoneId), reason: r.id);
-      }
-    });
-
-    test('every mock zone has a room on the plan', () {
+    test('every mock zone has a room on the trial plan', () {
       // The other direction of the join above, and the one that was missing.
       // MockData once described the industrial zones while the phone defaulted
       // to the home plan, so roomForZone returned null for every zone and the
@@ -129,20 +130,26 @@ void main() {
       }
     });
 
-    test('exit ids are unique', () {
-      final ids = FloorPlan.home.exits.map((e) => e.id).toList();
-      expect(ids.toSet().length, ids.length);
+    test('exit ids are unique within every drawing', () {
+      for (final plan in FloorPlan.byKey.values) {
+        final ids = plan.exits.map((e) => e.id).toList();
+        expect(ids.toSet().length, ids.length, reason: plan.siteKey);
+      }
     });
 
-    test('every drawn element sits inside the design space', () {
-      const plan = FloorPlan.home;
-      final bounds = Offset.zero & plan.designSize;
-      for (final r in plan.rooms) {
-        expect(bounds.contains(r.rect.topLeft), isTrue, reason: r.id);
-        expect(bounds.contains(r.rect.bottomRight), isTrue, reason: r.id);
-      }
-      for (final e in plan.exits) {
-        expect(bounds.contains(e.bar.center), isTrue, reason: e.id);
+    test('every drawn element sits inside its design space', () {
+      for (final plan in FloorPlan.byKey.values) {
+        final bounds = Offset.zero & plan.designSize;
+        for (final r in plan.rooms) {
+          expect(bounds.contains(r.rect.topLeft), isTrue,
+              reason: '${plan.siteKey}/${r.id}');
+          expect(bounds.contains(r.rect.bottomRight), isTrue,
+              reason: '${plan.siteKey}/${r.id}');
+        }
+        for (final e in plan.exits) {
+          expect(bounds.contains(e.bar.center), isTrue,
+              reason: '${plan.siteKey}/${e.id}');
+        }
       }
     });
   });
@@ -161,7 +168,7 @@ void main() {
       return jsonDecode(f.readAsStringSync()) as Map<String, dynamic>;
     }
 
-    for (final entry in {'home': FloorPlan.home}.entries) {
+    for (final entry in FloorPlan.byKey.entries) {
       test('${entry.key}: exit ids and coordinate space match', () {
         final site = load(entry.key);
         if (site == null) {

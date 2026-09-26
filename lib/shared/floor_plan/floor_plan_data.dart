@@ -19,8 +19,8 @@ enum FloorPlanMode {
 /// parts that change with the fire — which way to walk, which doors are cut —
 /// arrive over the wire.
 ///
-/// **This is a mirrored contract** with `alert-service/sites/home.json`, and it
-/// holds on exactly two things:
+/// **This is a mirrored contract** with `alert-service/sites/<key>.json`, and
+/// it holds on exactly two things:
 ///
 ///  * the **exit ids**, which is how a server-blocked exit finds its bar here;
 ///  * the **coordinate space** — [designSize] and the site file's `pxPerM` must
@@ -94,6 +94,108 @@ class FloorPlan {
 
   @override
   int get hashCode => Object.hash(siteKey, revision);
+
+  // ── Industrial unit — the demo facility ──────────────────────────────────────────
+  //
+  // Transcribed unchanged from the original prototype, and the reason
+  // sites/industrial.json uses 10 px/m: at that scale these literals describe a
+  // 36.0 × 34.8 m floor, so the graph and this drawing are the same building.
+  static const industrial = FloorPlan(
+    siteKey: 'industrial',
+    revision: '2026-09-25.1',
+    designSize: Size(360, 348),
+    shell: Rect.fromLTWH(14, 14, 318, 312),
+    rooms: [
+      PlanRoom('fabric-store', Rect.fromLTWH(18, 18, 130, 66), 'Fabric Store',
+          zoneId: 'fabric-store'),
+      PlanRoom('cutting-floor', Rect.fromLTWH(18, 88, 130, 66), 'Cutting Floor',
+          zoneId: 'cutting-floor'),
+      PlanRoom('dyeing', Rect.fromLTWH(178, 18, 150, 66), 'Dyeing Section',
+          zoneId: 'dyeing'),
+      PlanRoom('warehouse', Rect.fromLTWH(178, 88, 150, 66), 'Warehouse',
+          zoneId: 'warehouse'),
+      PlanRoom('finishing', Rect.fromLTWH(18, 188, 130, 58), 'Finishing',
+          zoneId: 'finishing'),
+      PlanRoom('boiler', Rect.fromLTWH(18, 252, 130, 68), 'Boiler Room',
+          zoneId: 'boiler'),
+      PlanRoom('sewing-a', Rect.fromLTWH(178, 188, 150, 58), 'Sewing Floor',
+          zoneId: 'sewing-a'),
+      // No detector in Packing & Dispatch. `zoneId: null` rather than a made-up
+      // id: inventing one would assert monitoring that does not exist.
+      PlanRoom('packing', Rect.fromLTWH(178, 252, 150, 68), 'Packing &',
+          line2: 'Dispatch'),
+    ],
+    walkways: [
+      Rect.fromLTWH(150, 16, 26, 308),
+      Rect.fromLTWH(16, 158, 314, 26),
+    ],
+    guides: [
+      PlanGuide(Offset(163, 18), Offset(163, 322)),
+      PlanGuide(Offset(18, 171), Offset(328, 171)),
+    ],
+    doors: [
+      Rect.fromLTWH(145, 48, 6, 14),
+      Rect.fromLTWH(145, 112, 6, 14),
+      Rect.fromLTWH(175, 48, 6, 14),
+      Rect.fromLTWH(175, 112, 6, 14),
+      Rect.fromLTWH(145, 210, 6, 14),
+      Rect.fromLTWH(145, 280, 6, 14),
+      Rect.fromLTWH(175, 210, 6, 14),
+      Rect.fromLTWH(175, 280, 6, 14),
+      Rect.fromLTWH(118, 152, 14, 6),
+      Rect.fromLTWH(205, 152, 14, 6),
+    ],
+    exits: [
+      PlanExit(
+        id: 'exit-east', name: 'EAST FIRE EXIT', primary: true,
+        bar: Rect.fromLTWH(329, 158, 9, 26),
+        labelCx: 298, labelBaselineY: 150, musterAt: Offset(346, 171),
+      ),
+      PlanExit(
+        id: 'exit-north', name: 'North door',
+        bar: Rect.fromLTWH(46, 9, 38, 9),
+        labelCx: 65, labelBaselineY: 6, musterAt: Offset(65, 13),
+      ),
+      PlanExit(
+        id: 'exit-south', name: 'South door',
+        bar: Rect.fromLTWH(58, 322, 34, 9),
+        labelCx: 75, labelBaselineY: 342, musterAt: Offset(75, 326),
+      ),
+      PlanExit(
+        id: 'exit-bay', name: 'Loading bay',
+        bar: Rect.fromLTWH(238, 322, 48, 9),
+        labelCx: 262, labelBaselineY: 342, musterAt: Offset(262, 326),
+      ),
+    ],
+    defaultRoute: [
+      Offset(138, 55),
+      Offset(163, 55),
+      Offset(163, 171),
+      Offset(336, 171),
+    ],
+    youAt: Offset(138, 55),
+    fireAt: Offset(42, 66),
+    musterAt: Offset(346, 171),
+  );
+
+  /// Every drawing this build has, keyed by the site key the backend stamps on
+  /// a route (`alert-service/sites/<key>.json`).
+  static const byKey = <String, FloorPlan>{
+    'home': home,
+    'industrial': industrial,
+  };
+
+  /// The drawing for [key], or null when this build has none for it.
+  ///
+  /// NULL IS A REAL ANSWER, NOT A FAILURE TO HANDLE. A backend pointed at a site
+  /// this app was never given artwork for must make the route unavailable and say
+  /// so, because a polyline only means anything in the coordinate space it was
+  /// computed in. There is deliberately no "closest" or default plan here: home
+  /// is 25 px/m and industrial is 10 px/m, so the same coordinates land 2.5x
+  /// further into one building than the other, and guessing would draw a
+  /// confident path through the wrong walls.
+  static FloorPlan? forSiteKey(String? key) =>
+      (key == null || key.isEmpty) ? null : byKey[key];
 
   // ── Home — the facility the trials actually ran in ──────────────────────
   //

@@ -65,25 +65,33 @@ class _IncidentScreenState extends State<IncidentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final incident = RepositoryScope.of(context).activeIncident;
+    final repo = RepositoryScope.of(context);
+    final incident = repo.activeIncident;
     final zone = incident.zone;
     final event = incident.event;
     final elapsed = _now.difference(event.detectedAt);
     final isFire = incident.severity == IncidentSeverity.fire;
     final occupants = incident.occupancy.current;
 
-    // The app draws one building; the route was generated against whatever
-    // building the backend is configured for. Usually the same one, but the
-    // backend can be pointed at another site without the app knowing.
+    // WHICH BUILDING TO DRAW IS READ FROM THE DATA, NEVER CHOSEN ON THE PHONE.
+    // The route names the site it was generated for; failing that the backend
+    // says which site it is serving; failing both, the trial facility. There
+    // used to be a setting for this on the dashboard, and the whole reason it
+    // had to go is that a phone set to one building could be shown a route
+    // computed for another with nothing to reconcile them.
     //
     // A polyline only means anything in the coordinate space it was computed in,
-    // so when they disagree the route is NOT drawn on the other building's plan.
-    // A correct path through the wrong walls is worse than no path: it looks
-    // exactly as authoritative and leads somewhere that does not exist.
-    const plan = FloorPlan.home;
+    // so a route is drawn ONLY on the plan for its own site. When this build has
+    // no plan for that site the route is withheld: a correct path through the
+    // wrong walls is worse than no path, because it looks exactly as
+    // authoritative and leads somewhere that does not exist.
     final route = incident.route;
-    final layoutMatches = route == null || route.siteKey.isEmpty ||
-        route.siteKey == plan.siteKey;
+    final routeSite = route?.siteKey ?? '';
+    final plan = FloorPlan.forSiteKey(
+            routeSite.isNotEmpty ? routeSite : repo.siteKey) ??
+        FloorPlan.home;
+    final layoutMatches = route == null || routeSite.isEmpty ||
+        routeSite == plan.siteKey;
     final drawableRoute = layoutMatches ? route : null;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -210,7 +218,7 @@ class _IncidentScreenState extends State<IncidentScreen> {
                 onSafe: () {
                   // Personal muster check-in (best-effort), then show the
                   // "you're marked safe" screen.
-                  RepositoryScope.of(context).ackSafe();
+                  repo.ackSafe();
                   context.pushReplacement('/resolved');
                 },
                 onCall: _callEmergency,
@@ -416,7 +424,13 @@ class _LayoutMismatch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = routeSite == 'home' ? 'Home demo' : 'Industrial';
+    // Name the site the route claims, whatever it is. Mapping every unknown key
+    // to "Industrial" was safe only while there were exactly two layouts.
+    final name = switch (routeSite) {
+      'home' => 'Home demo',
+      'industrial' => 'Industrial',
+      _ => routeSite,
+    };
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
@@ -432,8 +446,8 @@ class _LayoutMismatch extends StatelessWidget {
           Expanded(
             child: Text(
               'No route shown. This alert was generated for the "$name" layout, '
-              'and this phone is set to a different one. Switch the escape route '
-              'layout on the site status screen.',
+              'and this app has no floor plan for it, so the route cannot be '
+              'drawn. Leave by the escape signs in the building.',
               style: AppText.inter(13, 500, color: AppColors.warnInk, height: 1.4),
             ),
           ),

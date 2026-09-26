@@ -8,22 +8,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'helpers/test_surface.dart';
 
-/// A route generated for a building this app does not draw.
+/// Which floor plan a route is drawn on, and what happens when there is none.
 ///
-/// The app draws one facility, the trial house. The backend can be pointed at
-/// another site without the app knowing, and a polyline only means anything in
-/// the coordinate space it was computed in. So a route whose site key is not
-/// ours is REFUSED, with a line on screen saying why. A correct path through the
-/// wrong walls looks exactly as authoritative as a right one, which makes
-/// drawing it the worse failure.
+/// The plan is chosen from the data: the route names the site it was generated
+/// for, and `FloorPlan.forSiteKey` finds the drawing for it. A polyline only
+/// means anything in the coordinate space it was computed in -- home is 25 px/m
+/// and industrial is 10 px/m -- so a route is drawn on its OWN site's plan or
+/// not at all. When this build has no plan for that site the route is withheld
+/// and the screen says why, because a correct path through the wrong walls looks
+/// exactly as authoritative as a right one.
 ///
-/// There used to be a switch on the dashboard that chose between two layouts,
+/// There used to be a switch on the dashboard choosing between the two layouts,
 /// and this file used to pin that the switch and the backend were free to
-/// disagree. The second layout is gone -- no trial could run in it -- but the
-/// disagreement it created can still arrive from the backend, so the refusal
-/// stays and so does its test.
+/// disagree. That was the bug, not the feature: nothing reconciled them. The
+/// switch is gone and the data decides, so the cases below are about site keys
+/// rather than about a setting.
 void main() {
-  group('a route for a building the phone is not showing', () {
+  group('choosing the plan for a route', () {
     Incident withRouteFor(String siteKey) {
       final now = DateTime.now();
       final zone = MockData.zones(now).first;
@@ -84,9 +85,11 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
     }
 
-    testWidgets('is refused, and says so', (tester) async {
-      // The app draws the house; this route was computed for another building.
-      await openIncident(tester, withRouteFor('industrial'));
+    testWidgets('a site with no plan in this build is refused, and says so',
+        (tester) async {
+      // Not 'industrial' -- this build has that drawing. A site key it has never
+      // been given artwork for is the case that must refuse.
+      await openIncident(tester, withRouteFor('warehouse-b'));
 
       await scrollTo(tester, find.textContaining('No route shown'));
       expect(find.textContaining('No route shown'), findsOneWidget);
@@ -95,13 +98,27 @@ void main() {
       expect(find.text('Leave through the east fire exit.'), findsNothing);
     });
 
-    testWidgets('is drawn when the site keys agree', (tester) async {
+    testWidgets('the trial facility is drawn', (tester) async {
       await openIncident(tester, withRouteFor('home'));
 
       await scrollTo(tester, find.text('Leave through the east fire exit.'));
       expect(find.textContaining('No route shown'), findsNothing);
       expect(find.text('Leave through the east fire exit.'), findsOneWidget);
       // The plan itself must be on screen, not just the instruction under it.
+      expect(find.byType(FloorPlanView), findsOneWidget);
+    });
+
+    testWidgets('an industrial route is drawn on the industrial plan',
+        (tester) async {
+      // `SITE_KEY=industrial` on the backend stamps its routes that way. The app
+      // holds that drawing, so the route is drawn rather than refused -- no
+      // setting on the phone has to be changed first, which is what used to be
+      // required and what used to be got wrong.
+      await openIncident(tester, withRouteFor('industrial'));
+
+      await scrollTo(tester, find.text('Leave through the east fire exit.'));
+      expect(find.textContaining('No route shown'), findsNothing);
+      expect(find.text('Leave through the east fire exit.'), findsOneWidget);
       expect(find.byType(FloorPlanView), findsOneWidget);
     });
 
