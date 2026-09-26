@@ -66,6 +66,9 @@ replace statutory signage or the instructions of a trained fire warden.
 - **An alert that presents itself.** A confirmed fire is a full-screen Android
   notification on the fire channel, so a locked phone shows the alarm and the
   route can be read without unlocking. A gas warning never does this.
+- **Either facility.** The app holds a floor plan for both the trial home and the
+  demonstration hall, and draws whichever one the backend generated the route
+  for. Nothing on the phone has to be changed to follow it.
 - **It works when things go wrong.** The app runs with no backend and no Firebase
   configuration, and a push carries enough data to draw the full route offline.
 
@@ -205,15 +208,20 @@ Each point is a decision taken for a stated reason.
 - **Android is the target platform.** The trials need one platform that receives
   push notifications reliably. The code is Flutter, so iOS remains a supported
   path.
-- **The floor plan is drawn in the app on purpose.** The backend owns the graph
+- **The floor plans are drawn in the app on purpose.** The backend owns the graph
   and the route; the app owns the artwork, which keeps the plan readable under
-  pressure. One plan is included, the home used in the trials. An industrial plan
-  and a switch between the two were removed, because those premises were never
-  accessible and no trial could run there.
-- **A route for another building is refused.** The backend can be pointed at a
-  different site, so if a route does not name the building the app draws, the app
-  says why instead of drawing it. A correct path over the wrong plan would look
-  just as convincing as a right one.
+  pressure. Two plans are included: the home used in the trials and the
+  demonstration hall.
+- **The app chooses the plan from the data, not from a setting.** Every route
+  names the site it was generated for, and the app draws it on that site's plan.
+  A switch on the dashboard used to choose the plan instead, and nothing
+  reconciled it with the backend, so a phone could be set to one building and
+  shown a route computed for another.
+- **A route for a building with no plan is refused.** If a route names a site
+  this build has no drawing for, the app says why instead of drawing it. A
+  correct path over the wrong plan would look just as convincing as a right one,
+  and the two plans are at different scales, so the path would not even be
+  close.
 - **A check-out identifies a device, not a person.** This is what makes the count
   reliable, because a double tap or a retry counts once. It also means two people
   sharing a phone appear as one. No personal data is stored.
