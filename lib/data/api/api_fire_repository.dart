@@ -32,7 +32,7 @@ class ApiFireRepository extends FireRepository {
   final Map<String, IncidentReport> _reports = {};
   late Incident _active;
   bool _allClear = true;
-  String _siteKey = 'unit7';
+  String _siteKey = 'home';
 
   /// This device's FCM token, kept so a check-out can be attributed to one
   /// handset and therefore counted exactly once.
@@ -87,7 +87,7 @@ class ApiFireRepository extends FireRepository {
 
   /// Ask which facility the backend is routing for. Fetched once, not polled:
   /// a building does not change while the app is open. Never throws — with no
-  /// backend the seeded demo site is exactly the right fallback.
+  /// backend `home`, the default on both sides, is exactly the right fallback.
   Future<void> _loadSite() async {
     try {
       final plan = await _api.getSitePlan();

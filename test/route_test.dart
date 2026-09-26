@@ -94,11 +94,11 @@ void main() {
   });
 
   group('FloorPlan', () {
-    test('selects a site, and falls back to the demo one', () {
+    test('selects a site, and falls back to the trial one', () {
       expect(FloorPlan.bySiteKey('home').siteKey, 'home');
       expect(FloorPlan.bySiteKey('unit7').siteKey, 'unit7');
-      expect(FloorPlan.bySiteKey(null).siteKey, 'unit7');
-      expect(FloorPlan.bySiteKey('typo').siteKey, 'unit7');
+      expect(FloorPlan.bySiteKey(null).siteKey, 'home');
+      expect(FloorPlan.bySiteKey('typo').siteKey, 'home');
     });
 
     test('identity is site + revision, not sixty Rects', () {

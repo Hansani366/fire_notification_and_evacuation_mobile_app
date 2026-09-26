@@ -34,7 +34,7 @@ void main() {
 
     test('an unknown value falls back rather than throwing', () async {
       await AppConfig.setExitLayout('nonsense');
-      expect(AppConfig.exitLayout, 'unit7');
+      expect(AppConfig.exitLayout, 'home');
     });
 
     test('it survives a restart', () async {

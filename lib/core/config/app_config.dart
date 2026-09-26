@@ -81,14 +81,15 @@ class AppConfig {
   /// other, so a phone can be pointed at a different layout without touching the
   /// server, and a server restart cannot silently change what a responder sees.
   ///
-  /// Defaults to `unit7`, which is also what a phone with no stored preference
-  /// and no backend shows.
-  static String _exitLayout = 'unit7';
+  /// Defaults to `home`, the trial facility, which is also what a phone with no
+  /// stored preference and no backend shows. The backend defaults to the same
+  /// site, so the two agree before anyone changes either one.
+  static String _exitLayout = 'home';
 
   static String get exitLayout => _exitLayout;
 
   static Future<void> setExitLayout(String key) async {
-    _exitLayout = key == 'home' ? 'home' : 'unit7';
+    _exitLayout = key == 'unit7' ? 'unit7' : 'home';
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_layoutKey, _exitLayout);

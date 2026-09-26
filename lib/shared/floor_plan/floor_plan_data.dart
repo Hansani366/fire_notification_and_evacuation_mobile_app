@@ -80,7 +80,7 @@ class FloorPlan {
     return null;
   }
 
-  static FloorPlan bySiteKey(String? key) => key == 'home' ? home : unit7;
+  static FloorPlan bySiteKey(String? key) => key == 'unit7' ? unit7 : home;
 
   /// Identity is site + revision, not deep equality.
   ///
