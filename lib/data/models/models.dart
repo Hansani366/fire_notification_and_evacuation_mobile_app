@@ -8,7 +8,7 @@ library;
 
 import 'dart:ui' show Offset;
 
-import 'package:flutter/foundation.dart' show listEquals;
+import 'package:flutter/foundation.dart' show debugPrint, listEquals;
 
 // ── JSON parse helpers (tolerant of nulls / string-encoded numbers) ──────────
 double _asDouble(dynamic v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 0.0;
@@ -184,16 +184,27 @@ enum ZoneGlyph {
   bedroom,
   dining,
   living,
-  verander;
+  verander,
+
+  /// A glyph this build does not know, and one it draws as a plain room.
+  ///
+  /// AN UNKNOWN GLYPH MUST LOOK UNKNOWN. Anything unrecognised used to become a
+  /// fabric roll — silently, with no crash and no log — so a zone added to
+  /// `zones_seed.py` with a glyph this app has never heard of appeared as a
+  /// bolt of cloth in a bedroom, and nobody would find out until the tile was
+  /// on a screen in front of somebody. A neutral icon is a visible question
+  /// rather than a confident wrong answer.
+  unknown;
 
   String get wire => name;
 
   static ZoneGlyph fromWire(String? s) {
-    if (s == null) return ZoneGlyph.fabricRoll;
+    if (s == null || s.isEmpty) return ZoneGlyph.unknown;
     try {
       return ZoneGlyph.values.byName(s);
     } catch (_) {
-      return ZoneGlyph.fabricRoll;
+      debugPrint('[ZoneGlyph] unknown glyph "$s" — drawing it as a plain room');
+      return ZoneGlyph.unknown;
     }
   }
 }

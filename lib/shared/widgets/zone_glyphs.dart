@@ -28,6 +28,9 @@ class ZoneGlyphIcon extends StatelessWidget {
       ZoneGlyph.dining => Icons.dining_outlined,
       ZoneGlyph.living => Icons.weekend_outlined,
       ZoneGlyph.verander => Icons.deck_outlined,
+      // Deliberately generic: a zone whose glyph this build does not know is
+      // drawn as a room, not as one of the factory glyphs.
+      ZoneGlyph.unknown => Icons.meeting_room_outlined,
       _ => null,
     };
     if (material != null) {
