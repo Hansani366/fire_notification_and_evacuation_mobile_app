@@ -52,7 +52,7 @@ abstract class FireRepository extends ChangeNotifier {
   /// The backend owns the graph and the app owns the artwork, so this is the
   /// handshake between them (`GET /api/site/plan`). Defaults to the demo site,
   /// which is also the right answer when there is no backend at all.
-  String get siteKey => 'unit7';
+  String get siteKey => 'industrial';
 
   /// Personal "I'm safe" muster check-in for the active incident.
   /// No-op in the mock; the live repository posts it to the backend.

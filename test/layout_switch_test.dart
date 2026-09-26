@@ -20,7 +20,7 @@ void main() {
   group('the setting', () {
     test('defaults to industrial', () {
       expect(FloorPlan.bySiteKey(AppConfig.exitLayout).siteKey, isNotEmpty);
-      expect(AppConfig.exitLayout, anyOf('unit7', 'home'));
+      expect(AppConfig.exitLayout, anyOf('industrial', 'home'));
     });
 
     test('switching picks the other plan', () async {
@@ -28,8 +28,8 @@ void main() {
       expect(AppConfig.exitLayout, 'home');
       expect(FloorPlan.bySiteKey(AppConfig.exitLayout), FloorPlan.home);
 
-      await AppConfig.setExitLayout('unit7');
-      expect(FloorPlan.bySiteKey(AppConfig.exitLayout), FloorPlan.unit7);
+      await AppConfig.setExitLayout('industrial');
+      expect(FloorPlan.bySiteKey(AppConfig.exitLayout), FloorPlan.industrial);
     });
 
     test('an unknown value falls back rather than throwing', () async {
@@ -50,7 +50,7 @@ void main() {
       await AppConfig.setExitLayout('home');
       final repo = MockFireRepository();
       expect(repo.exitLayout, 'home');
-      expect(repo.siteKey, 'unit7');      // the backend handshake default
+      expect(repo.siteKey, 'industrial');      // the backend handshake default
     });
   });
 
@@ -117,7 +117,7 @@ void main() {
     testWidgets('is refused, and says so', (tester) async {
       // Phone showing the home plan; route computed for the factory.
       await AppConfig.setExitLayout('home');
-      await openIncident(tester, withRouteFor('unit7'));
+      await openIncident(tester, withRouteFor('industrial'));
 
       await scrollTo(tester, find.textContaining('No route shown'));
       expect(find.textContaining('No route shown'), findsOneWidget);
@@ -127,8 +127,8 @@ void main() {
     });
 
     testWidgets('is drawn when the layouts agree', (tester) async {
-      await AppConfig.setExitLayout('unit7');
-      await openIncident(tester, withRouteFor('unit7'));
+      await AppConfig.setExitLayout('industrial');
+      await openIncident(tester, withRouteFor('industrial'));
 
       await scrollTo(tester, find.text('Leave through the east fire exit.'));
       expect(find.textContaining('No route shown'), findsNothing);

@@ -35,7 +35,7 @@ class AppConfig {
         _baseUrl = _normalise(saved);
       }
       final layout = prefs.getString(_layoutKey);
-      if (layout == 'home' || layout == 'unit7') _exitLayout = layout!;
+      if (layout == 'home' || layout == 'industrial') _exitLayout = layout!;
     } catch (_) {
       // Non-fatal: fall back to the compile-time default.
     }
@@ -73,7 +73,7 @@ class AppConfig {
     }
   }
 
-  /// Which building's escape-route layout to draw: `unit7` or `home`.
+  /// Which building's escape-route layout to draw: `industrial` or `home`.
   ///
   /// DELIBERATELY A LOCAL SETTING, NOT ONE THE BACKEND SUPPLIES. The dashboard
   /// has its own switch for what counts as a fire; this one chooses which floor
@@ -89,7 +89,7 @@ class AppConfig {
   static String get exitLayout => _exitLayout;
 
   static Future<void> setExitLayout(String key) async {
-    _exitLayout = key == 'unit7' ? 'unit7' : 'home';
+    _exitLayout = key == 'industrial' ? 'industrial' : 'home';
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_layoutKey, _exitLayout);

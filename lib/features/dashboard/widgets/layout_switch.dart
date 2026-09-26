@@ -37,7 +37,7 @@ class LayoutSwitch extends StatelessWidget {
               style: AppText.quietLabel, overflow: TextOverflow.ellipsis),
         ),
         for (final option in const [
-          ('unit7', 'Industrial'),
+          ('industrial', 'Industrial'),
           ('home', 'Home demo'),
         ])
           Padding(

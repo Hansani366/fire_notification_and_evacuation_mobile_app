@@ -1,12 +1,12 @@
 import '../models/models.dart';
 
 /// Sample content transcribed verbatim from `App_design_v5.html`
-/// (Meridian Garments · Unit 7). Zones and the active incident depend on "now"
+/// (Meridian Garments, the industrial unit). Zones and the active incident depend on "now"
 /// so their relative timestamps read naturally; history is static.
 class MockData {
   MockData._();
 
-  static const siteName = 'Unit 7';
+  static const siteName = 'Industrial Unit';
 
   /// 7 detectors, all clear (resting "All clear" state).
   static List<Zone> zones(DateTime now) => [

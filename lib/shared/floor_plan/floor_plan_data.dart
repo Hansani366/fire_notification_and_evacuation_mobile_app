@@ -80,7 +80,7 @@ class FloorPlan {
     return null;
   }
 
-  static FloorPlan bySiteKey(String? key) => key == 'unit7' ? unit7 : home;
+  static FloorPlan bySiteKey(String? key) => key == 'industrial' ? industrial : home;
 
   /// Identity is site + revision, not deep equality.
   ///
@@ -97,13 +97,13 @@ class FloorPlan {
   @override
   int get hashCode => Object.hash(siteKey, revision);
 
-  // ── Unit 7 — the demo facility ──────────────────────────────────────────
+  // ── Industrial unit — the demo facility ──────────────────────────────────────────
   //
   // Transcribed unchanged from the original prototype, and the reason
-  // sites/unit7.json uses 10 px/m: at that scale these literals describe a
+  // sites/industrial.json uses 10 px/m: at that scale these literals describe a
   // 36.0 × 34.8 m floor, so the graph and this drawing are the same building.
-  static const unit7 = FloorPlan(
-    siteKey: 'unit7',
+  static const industrial = FloorPlan(
+    siteKey: 'industrial',
     revision: '2026-09-25.1',
     designSize: Size(360, 348),
     shell: Rect.fromLTWH(14, 14, 318, 312),

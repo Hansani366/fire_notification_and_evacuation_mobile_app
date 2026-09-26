@@ -10,7 +10,7 @@ void main() {
   group('EvacRoute parsing', () {
     final wire = <String, dynamic>{
       'status': 'exit',
-      'siteKey': 'unit7',
+      'siteKey': 'industrial',
       'planRevision': '2026-09-25.1',
       'fireZoneId': 'fabric-store',
       'from': {'x': 163, 'y': 55},
@@ -57,7 +57,7 @@ void main() {
     test('rebuilds from the flat FCM payload, for when the network is down', () {
       final r = EvacRoute.fromFcm({
         'routeStatus': 'exit',
-        'routeSiteKey': 'unit7',
+        'routeSiteKey': 'industrial',
         'routeExitName': 'EAST FIRE EXIT',
         'routeInstruction': 'Leave through the east fire exit.',
         'routeBlockedExits': 'exit-north',
@@ -96,38 +96,38 @@ void main() {
   group('FloorPlan', () {
     test('selects a site, and falls back to the trial one', () {
       expect(FloorPlan.bySiteKey('home').siteKey, 'home');
-      expect(FloorPlan.bySiteKey('unit7').siteKey, 'unit7');
+      expect(FloorPlan.bySiteKey('industrial').siteKey, 'industrial');
       expect(FloorPlan.bySiteKey(null).siteKey, 'home');
       expect(FloorPlan.bySiteKey('typo').siteKey, 'home');
     });
 
     test('identity is site + revision, not sixty Rects', () {
-      expect(FloorPlan.unit7, equals(FloorPlan.unit7));
-      expect(FloorPlan.unit7, isNot(equals(FloorPlan.home)));
+      expect(FloorPlan.industrial, equals(FloorPlan.industrial));
+      expect(FloorPlan.industrial, isNot(equals(FloorPlan.home)));
     });
 
     test('every room with a zoneId names a real zone in that site', () {
       // The plan ids and the zone ids drifted apart once already (`cutting` vs
       // `cutting-floor`), and it went unnoticed because nothing joined them.
       // focusRoomId joins them now.
-      const unit7Zones = {
+      const industrialZones = {
         'fabric-store', 'cutting-floor', 'dyeing', 'sewing-a',
         'warehouse', 'boiler', 'finishing',
       };
-      for (final r in FloorPlan.unit7.rooms) {
-        if (r.zoneId != null) expect(unit7Zones, contains(r.zoneId), reason: r.id);
+      for (final r in FloorPlan.industrial.rooms) {
+        if (r.zoneId != null) expect(industrialZones, contains(r.zoneId), reason: r.id);
       }
     });
 
     test('exit ids are unique within a site', () {
-      for (final plan in [FloorPlan.unit7, FloorPlan.home]) {
+      for (final plan in [FloorPlan.industrial, FloorPlan.home]) {
         final ids = plan.exits.map((e) => e.id).toList();
         expect(ids.toSet().length, ids.length, reason: plan.siteKey);
       }
     });
 
     test('every drawn element sits inside the design space', () {
-      for (final plan in [FloorPlan.unit7, FloorPlan.home]) {
+      for (final plan in [FloorPlan.industrial, FloorPlan.home]) {
         final bounds = Offset.zero & plan.designSize;
         for (final r in plan.rooms) {
           expect(bounds.contains(r.rect.topLeft), isTrue, reason: '${plan.siteKey}/${r.id}');
@@ -154,7 +154,7 @@ void main() {
       return jsonDecode(f.readAsStringSync()) as Map<String, dynamic>;
     }
 
-    for (final entry in {'unit7': FloorPlan.unit7, 'home': FloorPlan.home}.entries) {
+    for (final entry in {'industrial': FloorPlan.industrial, 'home': FloorPlan.home}.entries) {
       test('${entry.key}: exit ids and coordinate space match', () {
         final site = load(entry.key);
         if (site == null) {
