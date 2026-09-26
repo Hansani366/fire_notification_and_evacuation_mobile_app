@@ -15,7 +15,7 @@ void main() {
 
     expect(find.text('Site status'), findsOneWidget);
     expect(find.text('All clear'), findsOneWidget);
-    expect(find.text('Fabric Store'), findsWidgets);
+    expect(find.text('Kitchen'), findsWidgets);
   });
 
   testWidgets('tapping a zone opens its detail, back returns home',
@@ -24,7 +24,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // First zone is on-screen, so the dashboard scroll position is untouched.
-    await tester.tap(find.text('Fabric Store'));
+    await tester.tap(find.text('Kitchen'));
     await tester.pumpAndSettle();
     expect(find.text('No fire or smoke'), findsOneWidget);
 

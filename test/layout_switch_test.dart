@@ -50,7 +50,7 @@ void main() {
       await AppConfig.setExitLayout('home');
       final repo = MockFireRepository();
       expect(repo.exitLayout, 'home');
-      expect(repo.siteKey, 'industrial');      // the backend handshake default
+      expect(repo.siteKey, 'home');            // the backend handshake default
     });
   });
 

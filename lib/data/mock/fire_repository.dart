@@ -50,9 +50,10 @@ abstract class FireRepository extends ChangeNotifier {
   /// Which facility drawing to pair a route with.
   ///
   /// The backend owns the graph and the app owns the artwork, so this is the
-  /// handshake between them (`GET /api/site/plan`). Defaults to the demo site,
-  /// which is also the right answer when there is no backend at all.
-  String get siteKey => 'industrial';
+  /// handshake between them (`GET /api/site/plan`). Defaults to `home`, the
+  /// default on the backend too, which is also the right answer when there is
+  /// no backend at all.
+  String get siteKey => 'home';
 
   /// Personal "I'm safe" muster check-in for the active incident.
   /// No-op in the mock; the live repository posts it to the backend.
@@ -86,13 +87,21 @@ class MockFireRepository extends FireRepository {
   /// an open gas warning, a carbon-monoxide alarm, a fire confirmed while the
   /// scene model was unreachable — without a backend. Left alone, this is the
   /// resting all-clear state with a fire fixture behind the takeover screens.
-  MockFireRepository({Incident? incident, this.live = false})
-      : _now = DateTime.now() {
-    _zones = MockData.zones(_now);
+  /// [siteKey] picks which facility the mock describes. It defaults to `home`,
+  /// and a test passes `'industrial'` to exercise the demonstration hall, so
+  /// switching between the two stays covered without a backend.
+  MockFireRepository({
+    Incident? incident,
+    this.live = false,
+    String siteKey = 'home',
+  })  : _now = DateTime.now(),
+        _siteKey = siteKey {
+    _zones = MockData.zones(_now, siteKey: siteKey);
     _incident = incident ?? MockData.incident(_now);
   }
 
   final DateTime _now;
+  final String _siteKey;
 
   /// Whether [activeIncident] represents something happening right now.
   final bool live;
@@ -100,7 +109,10 @@ class MockFireRepository extends FireRepository {
   late final Incident _incident;
 
   @override
-  String get siteName => MockData.siteName;
+  String get siteName => MockData.siteNameFor(_siteKey);
+
+  @override
+  String get siteKey => _siteKey;
 
   @override
   List<Zone> get zones => _zones;

@@ -1,15 +1,115 @@
 import '../models/models.dart';
 
-/// Sample content transcribed verbatim from `App_design_v5.html`
-/// (Meridian Garments, the industrial unit). Zones and the active incident depend on "now"
-/// so their relative timestamps read naturally; history is static.
+/// Sample content for the first paint and for widget tests.
+///
+/// MIRRORED CONTRACT with `alert-service/sites/*.json`: the ids, names, floors,
+/// detector ids and glyphs here are what the phone renders before the backend
+/// answers. They must match the site files, or the dashboard shows rooms that
+/// the building does not have.
+///
+/// Both facilities are held, because the app can draw either one. `home` is the
+/// default on the phone and in `alert-service`, so it is what the dashboard
+/// paints while the first fetch is in flight. Pass `siteKey: 'industrial'` for
+/// the demonstration hall, transcribed from `App_design_v5.html`
+/// (Meridian Garments).
+///
+/// Zones and the active incident depend on "now" so their relative timestamps
+/// read naturally; history is static.
 class MockData {
   MockData._();
 
-  static const siteName = 'Industrial Unit';
+  /// The default facility's display name. See [siteNameFor] for the other one.
+  static const siteName = 'Home';
+  static const industrialSiteName = 'Industrial Unit';
 
-  /// 7 detectors, all clear (resting "All clear" state).
-  static List<Zone> zones(DateTime now) => [
+  static String siteNameFor(String siteKey) =>
+      siteKey == 'industrial' ? industrialSiteName : siteName;
+
+  /// Zones of the given facility, all clear (resting "All clear" state).
+  ///
+  /// Defaults to `home`, so a phone with no backend shows the trial facility
+  /// rather than a factory it is not standing in.
+  static List<Zone> zones(DateTime now, {String siteKey = 'home'}) =>
+      siteKey == 'industrial' ? industrialZones(now) : homeZones(now);
+
+  /// The 8 rooms of the trial house, mirroring `sites/home.json`.
+  static List<Zone> homeZones(DateTime now) => [
+        Zone(
+          id: 'kitchen',
+          name: 'Kitchen',
+          floor: 'Ground floor',
+          detectorId: 'Detector 01',
+          status: ZoneStatus.clear,
+          lastScanAt: now.subtract(const Duration(seconds: 2)),
+          glyph: ZoneGlyph.kitchen,
+        ),
+        Zone(
+          id: 'dining',
+          name: 'Dining Area',
+          floor: 'Ground floor',
+          detectorId: 'Detector 02',
+          status: ZoneStatus.clear,
+          lastScanAt: now.subtract(const Duration(seconds: 3)),
+          glyph: ZoneGlyph.dining,
+        ),
+        Zone(
+          id: 'living',
+          name: 'Living Area',
+          floor: 'Ground floor',
+          detectorId: 'Detector 03',
+          status: ZoneStatus.clear,
+          lastScanAt: now.subtract(const Duration(seconds: 3)),
+          glyph: ZoneGlyph.living,
+        ),
+        Zone(
+          id: 'verander',
+          name: 'Verander',
+          floor: 'Ground floor',
+          detectorId: 'Detector 04',
+          status: ZoneStatus.clear,
+          lastScanAt: now.subtract(const Duration(seconds: 4)),
+          glyph: ZoneGlyph.verander,
+        ),
+        Zone(
+          id: 'bedroom-west',
+          name: 'Bedroom (West)',
+          floor: 'Ground floor',
+          detectorId: 'Detector 05',
+          status: ZoneStatus.clear,
+          lastScanAt: now.subtract(const Duration(seconds: 4)),
+          glyph: ZoneGlyph.bedroom,
+        ),
+        Zone(
+          id: 'bedroom-southwest',
+          name: 'Bedroom (SW)',
+          floor: 'Ground floor',
+          detectorId: 'Detector 06',
+          status: ZoneStatus.clear,
+          lastScanAt: now.subtract(const Duration(seconds: 5)),
+          glyph: ZoneGlyph.bedroom,
+        ),
+        Zone(
+          id: 'bedroom-northeast',
+          name: 'Bedroom (NE)',
+          floor: 'Ground floor',
+          detectorId: 'Detector 07',
+          status: ZoneStatus.clear,
+          lastScanAt: now.subtract(const Duration(seconds: 5)),
+          glyph: ZoneGlyph.bedroom,
+        ),
+        Zone(
+          id: 'bedroom-southeast',
+          name: 'Bedroom (SE)',
+          floor: 'Ground floor',
+          detectorId: 'Detector 08',
+          status: ZoneStatus.clear,
+          lastScanAt: now.subtract(const Duration(seconds: 6)),
+          glyph: ZoneGlyph.bedroom,
+        ),
+      ];
+
+  /// The 7 zones of the demonstration hall, mirroring `sites/industrial.json`.
+  static List<Zone> industrialZones(DateTime now) => [
         Zone(
           id: 'fabric-store',
           name: 'Fabric Store',
@@ -76,7 +176,7 @@ class MockData {
       ];
 
   static const List<HealthStat> health = [
-    HealthStat(label: 'Detectors', value: '7 online'),
+    HealthStat(label: 'Detectors', value: '8 online'),
     HealthStat(label: 'AI pipeline', value: 'Active'),
     HealthStat(label: 'Alerts', value: 'Armed'),
   ];
